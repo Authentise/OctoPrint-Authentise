@@ -1,30 +1,76 @@
 # coding=utf-8
 from __future__ import absolute_import
 
-### (Don't forget to remove me)
-# This is a basic skeleton for your plugin's __init__.py. You probably want to adjust the class name of your plugin
-# as well as the plugin mixins it's subclassing from. This is really just a basic skeleton to get you started,
-# defining your plugin as a template plugin.
-#
-# Take a look at the documentation on what other plugin mixins are available.
+import sys
+import os
+import subprocess
 
 import octoprint.plugin
 
-class AuthentisePlugin(octoprint.plugin.TemplatePlugin):
-	# TODO Implement me!
-	pass
-
-# If you want your plugin to be registered within OctoPrint under a different name than what you defined in setup.py
-# ("OctoPrint-PluginSkeleton"), you may define that here. Same goes for the other metadata derived from setup.py that
-# can be overwritten via __plugin_xyz__ control properties. See the documentation for that.
 __plugin_name__ = "Authentise"
 
+# AUTHENTISE_CLIENT_PATH = 'authentise-streaming-client'
+AUTHENTISE_CLIENT_PATH = '/Applications/Authentise.app/Contents/Resources/streamus-client'
+
+class AuthentisePlugin(octoprint.plugin.StartupPlugin,
+                       octoprint.plugin.TemplatePlugin,
+                       octoprint.plugin.SettingsPlugin,
+                       octoprint.plugin.AssetPlugin):
+
+    def _run_client(self, *args):
+        try:
+            return subprocess.check_output((AUTHENTISE_CLIENT_PATH,) + args)
+        except Exception as e:
+            self._logger.error("Error running client command `%s` using parameters: %s", e, args)
+            return
+
+    def on_after_startup(self):
+        self.node_version = self._run_client('--version')
+        if self.node_version:
+            self._logger.info("Found node version: %s", self.node_version)
+        else:
+            self._logger.warning("Could not find node version")
+
+        self.node_uuid = self._run_client('--node-uuid', '--logging-level', 'error')
+        if self.node_uuid:
+            self._logger.info("Found node uuid: %s", self.node_uuid)
+        else:
+            self._logger.warning("Could not find node uuid")
+
+    def get_assets(self):
+        return dict(
+            js=["js/authentise.js"]
+        )
+
+    def get_update_information(self):
+        return dict(
+            authentise=dict(
+                displayName="Authentise Plugin",
+                displayVersion=self._plugin_version,
+                type="github_release",
+                user="OctoPrint",
+                repo="OctoPrint-Authentise",
+                current=self._plugin_version,
+                pip="https://github.com/Authentise/OctoPrint-Authentise/archive/{target_version}.zip"
+            )
+        )
+
+    def get_template_configs(self):
+        return []
+
+    def get_template_vars(self):
+        return dict(
+            node_uuid=(self.node_uuid or 'Unknown'),
+            node_version=(self.node_version or 'Unknown'),
+            version=self._plugin_version,
+        )
+
+
 def __plugin_load__():
-	global __plugin_implementation__
-	__plugin_implementation__ = AuthentisePlugin()
+    global __plugin_implementation__
+    __plugin_implementation__ = AuthentisePlugin()
 
-	# global __plugin_hooks__
-	# __plugin_hooks__ = {
-	#    "some.octoprint.hook": __plugin_implementation__.some_hook_handler
-	# }
-
+    global __plugin_hooks__
+    __plugin_hooks__ = {
+        "octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information
+    }
