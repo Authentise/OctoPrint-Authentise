@@ -55,8 +55,11 @@ class AuthentisePlugin(octoprint.plugin.StartupPlugin,
             )
         )
 
-    def get_template_configs(self):
-        return []
+    def get_settings_defaults(self):
+        return dict(
+            api_key=None,
+            api_secret=None,
+        )
 
     def get_template_vars(self):
         return dict(
@@ -64,6 +67,11 @@ class AuthentisePlugin(octoprint.plugin.StartupPlugin,
             node_version=(self.node_version or 'Unknown'),
             version=self._plugin_version,
         )
+
+    def get_template_configs(self):
+        return [
+            dict(type="settings", custom_bindings=False)
+        ]
 
 
 def __plugin_load__():

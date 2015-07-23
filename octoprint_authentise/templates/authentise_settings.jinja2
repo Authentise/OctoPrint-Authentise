@@ -1,5 +1,5 @@
 <div class="media">
-  <a class="pull-left" href="#">
+  <a class="pull-left" href="http://www.authentise.com">
     <img width="64px" height="64px" class="media-object" src="https://app.authentise.com/d9aa90765f5595972194f850fb64079b.png" alt="Authentise">
   </a>
   <div class="media-body">
@@ -7,21 +7,36 @@
       Authentise Plugin <small>{{ plugin_authentise_version }}</small>
     </h4>
     <p>
-      <strong>Version:</strong> <small>{{ plugin_authentise_node_version }}</small>
-      <br/>
-      <strong>UUID:</strong> <small>{{ plugin_authentise_node_uuid }}</small>
+    <strong>Version:</strong> <small>{{ plugin_authentise_node_version }}</small>
+    <br/>
+    <strong>UUID:</strong> <small>{{ plugin_authentise_node_uuid }}</small>
     </p>
   </div>
 </div>
 
 <hr/>
 
-<h4>General</h4>
+<div class="alert">
+  <button type="button" class="close" data-dismiss="alert">&times;</button>
+  <strong>Need an Account?</strong> Click <a href="http://app.authentise.com/#/register" target="_blank">here</a> to register.
+</div>
+
+<h4>Api Token</h4>
 <form class="form-horizontal">
-  <div class="control-group hidden">
-    <label class="control-label">{{ _('Node UUID') }}</label>
-      <div class="controls">
-        <input type="text" class="input-block-level disabled" disabled value="{{ plugin_authentise_node_uuid }}" />
-      </div>
+  <div class="control-group">
+    <label class="control-label">{{ _('Key') }}</label>
+    <div class="controls">
+      <input type="text" class="input-block-level" data-bind="value: settings.plugins.authentise.api_key" />
+    </div>
+  </div>
+
+  <div class="control-group">
+    <label class="control-label">{{ _('Secret') }}</label>
+    <div class="controls">
+      <input type="password" class="input-block-level" data-bind="value: settings.plugins.authentise.api_secret" />
+      <span class="help-block">
+        <small>If you don't have an Authentise API token click <a href="#">here</a> to create one.</small>
+      </span>
+    </div>
   </div>
 </form>
