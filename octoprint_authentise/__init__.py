@@ -7,6 +7,7 @@ import subprocess
 import requests
 
 import octoprint.plugin
+from . import printer
 
 __plugin_name__ = "Authentise"
 
@@ -17,7 +18,8 @@ AUTHENTISE_PRINT_API = 'https://print.dev-auth.com'
 class AuthentisePlugin(octoprint.plugin.StartupPlugin,
                        octoprint.plugin.TemplatePlugin,
                        octoprint.plugin.SettingsPlugin,
-                       octoprint.plugin.AssetPlugin):
+                       octoprint.plugin.AssetPlugin,
+                       printer.AuthentisePrinter):
 
     def _run_client(self, *args):
         command = (
