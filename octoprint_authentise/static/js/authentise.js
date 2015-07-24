@@ -6,6 +6,7 @@ $(function() {
 
     this.onSubmit = $.proxy(function() {
       this.toggleLoading();
+      this.setMessage();
 
       var form = $("#authentise-connect"),
           data = {
@@ -13,14 +14,15 @@ $(function() {
             password: form.find("[name=authentise_pass]").val()
           };
 
-      var handleSuccess = $.proxy(function(result){
+      var handleSuccess = $.proxy(function(results){
         this.clearForm();
         this.hideModal();
       }, this);
 
       var handleError = $.proxy(function(jqXHR, textStatus, errorThrown){
         var results = jqXHR.responseJSON;
-        console.error("Error connecting to Authentise", results);
+        this.setMessage(results.message);
+        console.error("Error connecting to Authentise", results, jqXHR, textStatus, errorThrown);
       }, this);
 
       $.ajax({
@@ -35,6 +37,17 @@ $(function() {
       });
 
       return false;
+    }, this);
+
+    this.setMessage = $.proxy(function(message) {
+      var messageBox = $("#authentise-connect .modal-body .alert-error");
+      messageBox.children('span').text(message);
+
+      if(message) {
+        messageBox.fadeIn();
+        return
+      }
+      messageBox.fadeOut();
     }, this);
 
     this.hideModal = $.proxy(function() {
