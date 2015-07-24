@@ -1,0 +1,35 @@
+<a href="#" class="dropdown-toggle" data-toggle="dropdown">
+  Authentise
+  <b class="caret"></b>
+</a>
+<ul class="dropdown-menu" role="menu" aria-labelledby="dLabel">
+  <li>
+    <a tabindex="-1" href="#authentise-connect" data-toggle="modal">
+      <i class="icon-random"></i> Connect
+    </a>
+  </li>
+</ul>
+
+<form id="authentise-connect" class="modal hide fade" data-bind="submit: onSubmit">
+  <div class="modal-header">
+    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+    <h3><img width="26px" height="26px" src="https://app.authentise.com/d9aa90765f5595972194f850fb64079b.png" alt="Authentise"> Connect to Authentise</h3>
+  </div>
+  <div class="modal-body">
+    <img width="128px" height="128px" src="https://app.authentise.com/d9aa90765f5595972194f850fb64079b.png" alt="Authentise">
+    <div class="pull-right">
+      <label for="authenitse_user">{{ _('Username') }}</label>
+      <input type="text" id="authentise_user" name="authentise_user" required placeholder="{{ _('Username') }}" autocapitalize="none">
+      <label for="authentise_pass">{{ _('Password') }}</label>
+      <input type="password" id="authentise_pass" name="authentise_pass" required placeholder="{{ _('Password') }}">
+      <span class="help-block">
+        <small>Click <a href="http://app.authentise.com/#/register" target="_blank">here</a> to create an account.</small>
+      </span>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-primary" type="submit">
+      <i class="icon-random"></i> Connect
+    </button>
+  </div>
+</form>
