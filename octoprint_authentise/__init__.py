@@ -3,7 +3,7 @@ from __future__ import absolute_import
 
 import octoprint.plugin
 
-from octoprint_authentise import blueprint, asset, settings, startup, template, update, helpers
+from octoprint_authentise import blueprint, asset, settings, startup, template, update
 
 __plugin_name__ = "Authentise"
 
@@ -13,7 +13,6 @@ class AuthentisePlugin(
     settings.SettingsPlugin,
     asset.AssetPlugin,
     blueprint.BlueprintPlugin,
-    helpers.HelpersPlugin,
     update.UpdatePlugin
 ):
     pass

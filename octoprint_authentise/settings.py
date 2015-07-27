@@ -10,7 +10,3 @@ class SettingsPlugin(octoprint.plugin.SettingsPlugin):
             api_secret=None,
             claimed_by=None,
         )
-
-    def on_settings_save(self, data):
-        octoprint.plugin.SettingsPlugin.on_settings_save(self, data)
-        self.claim_node(data['api_key'], data['api_secret'])
