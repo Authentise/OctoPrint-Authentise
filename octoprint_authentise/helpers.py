@@ -51,7 +51,7 @@ class HelpersPlugin():
 
         url = "{}/client/claim/{}/".format(AUTHENTISE_PRINT_API, claim_code)
         response = requests.put(url, auth=(api_key, api_secret))
-        self._logger.info("Response from - POST - %s - %s", url, response.status_code, response.text)
+        self._logger.info("Response from - POST %s - %s - %s", url, response.status_code, response.text)
 
         if response.ok:
             self._logger.info("Claimed node: %s", self.node_uuid)

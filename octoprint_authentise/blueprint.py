@@ -16,4 +16,11 @@ class BlueprintPlugin(octoprint.plugin.BlueprintPlugin):
             return json.dumps(response_json), status_code
 
         status_code, response_json = self.create_api_token(cookies)
+        if status_code == 201:
+            self.on_settings_save({
+                "api_key": response_json.get('uuid'),
+                "api_secret": response_json.get('secret'),
+                "claimed_by": response_json.get('user_uuid'),
+            })
+
         return json.dumps(response_json), status_code
