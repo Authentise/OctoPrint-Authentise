@@ -122,9 +122,6 @@ def get_version():
     version = imp.load_source('version', os.path.join(basedir, plugin_package, 'version.py'))
     return version.VERSION
 
-
-
-
 with write_version():
     setup_parameters = octoprint_setuptools.create_plugin_setup_parameters(
             identifier=plugin_identifier,
