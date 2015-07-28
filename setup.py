@@ -45,6 +45,14 @@ plugin_license = "AGPLv3"
 # Any additional requirements besides OctoPrint should be listed here
 plugin_requires = []
 
+extra_requires = {
+    'develop': [
+        'pytest==2.7.2',
+        'pytest-mock==0.7.0',
+        'httpretty==0.8.10',
+    ]
+}
+
 ### --------------------------------------------------------------------------------------------------------------------
 ### More advanced options that you usually shouldn't have to touch follow after this point
 ### --------------------------------------------------------------------------------------------------------------------
@@ -152,6 +160,7 @@ with write_version():
             url=plugin_url,
             license=plugin_license,
             requires=plugin_requires,
+            extra_requires=extra_requires,
             additional_packages=plugin_addtional_packages,
             ignored_packages=plugin_ignored_packages,
             additional_data=plugin_additional_data

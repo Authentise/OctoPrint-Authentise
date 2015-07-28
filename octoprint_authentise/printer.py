@@ -13,7 +13,7 @@ import threading
 import time
 import re
 
-from . import comm
+from octoprint_authentise import comm
 
 import octoprint.plugin
 
