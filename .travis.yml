@@ -5,7 +5,7 @@ python:
 # command to install dependencies
 before_install:
   - "mkdir -p ~/src/"
-  - "git clone --branch=master git://github.com/Authentise/OctoPrint-Authentise.git ~/src/octoprint"
+  - "git clone --branch=master git://github.com/Authentise/OctoPrint.git ~/src/octoprint"
 install:
   - "pip install --upgrade pip"
   - "pip install ~/src/octoprint"
