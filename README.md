@@ -1,5 +1,5 @@
 # OctoPrint-Authentise
-![Current Build Status](https://travis-ci.org/Authentise/OctoPrint-Authentise.svg?branch=master)
+![Current Build Status](https://travis-ci.org/Authentise/OctoPrint-Authentise.svg)
 
 **TODO:** Describe what your plugin does.
 

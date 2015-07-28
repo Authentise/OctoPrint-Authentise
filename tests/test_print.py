@@ -2,7 +2,7 @@
 
 # @httpretty.activate
 def test_printer_connect(printer):
-    assert True
+    assert False
     # httpretty.register_uri(httpretty.GET, 'https://print.authentise.com/printer/'
     #                        body='',
     #                        content_type='application/json')
