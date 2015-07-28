@@ -1,4 +1,4 @@
-import httpretty
+# import httpretty
 
 # @httpretty.activate
 def test_printer_connect(printer):
