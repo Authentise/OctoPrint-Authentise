@@ -4,7 +4,7 @@ python:
 - '2.7'
 before_install:
 - mkdir -p ~/src/
-- git clone --branch=master git://github.com/Authentise/OctoPrint.git ~/src/octoprint
+- git clone --branch=devel git://github.com/Authentise/OctoPrint.git ~/src/octoprint
 install:
 - pip install --upgrade pip
 - pip install ~/src/octoprint
