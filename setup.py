@@ -74,8 +74,26 @@ additional_setup_parameters = {}
 VERSION_FILE = 'octoprint_authentise/version.py'
 
 def _get_output_or_none(args):
+    def _check_output(*popenargs, **kwargs):
+        r"""Run command with arguments and return its output as a byte string.
+        Backported from Python 2.7 as it's implemented as pure python on stdlib.
+        >>> check_output(['/usr/bin/python', '--version'])
+        Python 2.6.2
+        """
+        process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
+        output, unused_err = process.communicate()
+        retcode = process.poll()
+        if retcode:
+            cmd = kwargs.get("args")
+            if cmd is None:
+                cmd = popenargs[0]
+            error = subprocess.CalledProcessError(retcode, cmd)
+            error.output = output
+            raise error
+        return output
+
     try:
-        return subprocess.check_output(args).decode('utf-8').strip()
+        return _check_output(args).decode('utf-8').strip()
     except subprocess.CalledProcessError:
         return None
 
@@ -96,7 +114,7 @@ def _git_to_version(git):
         version = git
     else:
         version = "{tag}.post0.dev{offset}".format(**match.groupdict())
-    print("Calculated {} version '{}' from git description '{}'".format(plugin_package, version, git))
+    print("Calculated {0} version '{1}' from git description '{2}'".format(plugin_package, version, git))
     return version
 
 @contextlib.contextmanager
@@ -105,13 +123,13 @@ def write_version():
     git_branches = _get_git_branches_for_this_commit()
     version = _git_to_version(git_description) if git_description else None
     if git_branches and not _is_on_releasable_branch(git_branches):
-        print("Forcing version to 0.0.1 because this commit is on branches {} and not a whitelisted branch".format(git_branches))
+        print("Forcing version to 0.0.1 because this commit is on branches {0} and not a whitelisted branch".format(git_branches))
         version = '0.0.1'
     if version:
         with open(VERSION_FILE, 'r') as version_file:
             old_contents = version_file.read()
         with open(VERSION_FILE, 'w') as version_file:
-            version_file.write('VERSION = "{}"\n'.format(version))
+            version_file.write('VERSION = "{0}"\n'.format(version))
     yield
     if version:
         with open(VERSION_FILE, 'w') as version_file:
