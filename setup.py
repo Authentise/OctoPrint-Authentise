@@ -1,4 +1,17 @@
 # coding=utf-8
+from setuptools import setup
+import contextlib
+import imp
+import os
+import re
+import subprocess
+try:
+    import octoprint_setuptools
+except:
+    print("Could not import OctoPrint's setuptools, are you sure you are running that under "
+        "the same python installation that OctoPrint is installed under?")
+    import sys
+    sys.exit(-1)
 
 ########################################################################################################################
 ### Do not forget to adjust the following variables to your own plugin.
@@ -12,9 +25,6 @@ plugin_package = "octoprint_authentise"
 # The plugin's human readable name. Can be overwritten within OctoPrint's internal data via __plugin_name__ in the
 # plugin module
 plugin_name = "OctoPrint-Authentise"
-
-# The plugin's version. Can be overwritten within OctoPrint's internal data via __plugin_version__ in the plugin module
-plugin_version = "0.0.1"
 
 # The plugin's description. Can be overwritten within OctoPrint's internal data via __plugin_description__ in the plugin
 # module
@@ -61,34 +71,94 @@ additional_setup_parameters = {}
 
 ########################################################################################################################
 
-from setuptools import setup
+VERSION_FILE = 'octoprint_authentise/version.py'
 
-try:
-	import octoprint_setuptools
-except:
-	print("Could not import OctoPrint's setuptools, are you sure you are running that under "
-	      "the same python installation that OctoPrint is installed under?")
-	import sys
-	sys.exit(-1)
+def _get_output_or_none(args):
+    def _check_output(*popenargs, **kwargs):
+        r"""Run command with arguments and return its output as a byte string.
+        Backported from Python 2.7 as it's implemented as pure python on stdlib.
+        >>> check_output(['/usr/bin/python', '--version'])
+        Python 2.6.2
+        """
+        process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
+        output, unused_err = process.communicate()
+        retcode = process.poll()
+        if retcode:
+            cmd = kwargs.get("args")
+            if cmd is None:
+                cmd = popenargs[0]
+            error = subprocess.CalledProcessError(retcode, cmd)
+            error.output = output
+            raise error
+        return output
 
-setup_parameters = octoprint_setuptools.create_plugin_setup_parameters(
-	identifier=plugin_identifier,
-	package=plugin_package,
-	name=plugin_name,
-	version=plugin_version,
-	description=plugin_description,
-	author=plugin_author,
-	mail=plugin_author_email,
-	url=plugin_url,
-	license=plugin_license,
-	requires=plugin_requires,
-	additional_packages=plugin_addtional_packages,
-	ignored_packages=plugin_ignored_packages,
-	additional_data=plugin_additional_data
-)
+    try:
+        return _check_output(args).decode('utf-8').strip()
+    except subprocess.CalledProcessError:
+        return None
 
-if len(additional_setup_parameters):
-	from octoprint.util import dict_merge
-	setup_parameters = dict_merge(setup_parameters, additional_setup_parameters)
+def _get_git_description():
+    return _get_output_or_none(['git', 'describe'])
 
-setup(**setup_parameters)
+def _get_git_branches_for_this_commit():
+    branches = _get_output_or_none(['git', 'branch', '-r', '--contains', 'HEAD'])
+    split = branches.split('\n') if branches else []
+    return [branch.strip() for branch in split]
+
+def _is_on_releasable_branch(branches):
+    return any(['origin/master' == branch or branch.startswith('origin/hotfix') for branch in branches])
+
+def _git_to_version(git):
+    match = re.match(r'(?P<tag>[\d\.]+)-(?P<offset>[\d]+)-(?P<sha>\w{8})', git)
+    if not match:
+        version = git
+    else:
+        version = "{tag}.post0.dev{offset}".format(**match.groupdict())
+    print("Calculated {0} version '{1}' from git description '{2}'".format(plugin_package, version, git))
+    return version
+
+@contextlib.contextmanager
+def write_version():
+    git_description = _get_git_description()
+    git_branches = _get_git_branches_for_this_commit()
+    version = _git_to_version(git_description) if git_description else None
+    if git_branches and not _is_on_releasable_branch(git_branches):
+        print("Forcing version to 0.0.1 because this commit is on branches {0} and not a whitelisted branch".format(git_branches))
+        version = '0.0.1'
+    if version:
+        with open(VERSION_FILE, 'r') as version_file:
+            old_contents = version_file.read()
+        with open(VERSION_FILE, 'w') as version_file:
+            version_file.write('VERSION = "{0}"\n'.format(version))
+    yield
+    if version:
+        with open(VERSION_FILE, 'w') as version_file:
+            version_file.write(old_contents)
+
+def get_version():
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    version = imp.load_source('version', os.path.join(basedir, plugin_package, 'version.py'))
+    return version.VERSION
+
+with write_version():
+    setup_parameters = octoprint_setuptools.create_plugin_setup_parameters(
+            identifier=plugin_identifier,
+            package=plugin_package,
+            name=plugin_name,
+            version=get_version(),
+            description=plugin_description,
+            author=plugin_author,
+            mail=plugin_author_email,
+            url=plugin_url,
+            license=plugin_license,
+            requires=plugin_requires,
+            additional_packages=plugin_addtional_packages,
+            ignored_packages=plugin_ignored_packages,
+            additional_data=plugin_additional_data
+    )
+
+    if len(additional_setup_parameters):
+        from octoprint.util import dict_merge
+        setup_parameters = dict_merge(setup_parameters, additional_setup_parameters)
+
+    setup(**setup_parameters)
