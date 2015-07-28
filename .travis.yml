@@ -3,9 +3,12 @@ python:
   - "2.6"
   - "2.7"
 # command to install dependencies
+before_install:
+  - "mkdir -p ~/src/"
+  - "git clone -branch=master git@github.com:Authentise/OctoPrint-Authentise.git ~/src/octoprint"
 install:
   - "pip install --upgrade pip"
-  - "pip install octoprint"
+  - "pip install ~/src/octoprint"
   - "pip install .[develop]"
 # command to run tests
 script: py.test
