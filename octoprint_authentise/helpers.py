@@ -1,10 +1,11 @@
 # coding=utf-8
 from __future__ import absolute_import
 
-from uuid import uuid4
-import subprocess
-import requests
 import json
+import subprocess
+from uuid import uuid4
+
+import requests
 
 # AUTHENTISE_CLIENT_PATH = 'authentise-streaming-client'
 AUTHENTISE_CLIENT_PATH = '/Applications/Authentise.app/Contents/Resources/streamus-client'
