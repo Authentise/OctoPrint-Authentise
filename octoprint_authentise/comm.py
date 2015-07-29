@@ -4,45 +4,35 @@ __author__ = "Scott Lemmon <scott@authentise.com> based on work by Gina Häußge
 __license__ = "GNU Affero General Public License http://www.gnu.org/licenses/agpl.html"
 __copyright__ = "Copyright (C) 2015 Authentise - Released under terms of the AGPLv3 License"
 
-import threading
 import logging
+import requests
+import threading
 import urlparse
 
 from octoprint.events import eventManager, Events
 from octoprint.util import get_exception_string, RepeatedTimer, comm_helpers
-import requests
+import octoprint.plugin
 
 
-AUTHENTISE_URL = 'https://print.authentise.com'
-class AuthentiseMachineCom(object):
-    STATE_NONE = 0
-    STATE_OPEN_SERIAL = 1
-    STATE_DETECT_SERIAL = 2
-    STATE_DETECT_BAUDRATE = 3
-    STATE_CONNECTING = 4
-    STATE_OPERATIONAL = 5
-    STATE_PRINTING = 6
-    STATE_PAUSED = 7
-    STATE_CLOSED = 8
-    STATE_ERROR = 9
-    STATE_CLOSED_WITH_ERROR = 10
-    STATE_TRANSFERING_FILE = 11
-
-    def __init__(self, authentise_printer_id=None, api_key=None, api_secret=None, callbackObject=None):
+class AuthentiseMachineCom(octoprint.plugin.MachineComPlugin):
+    def startup(self, port = None, baudrate=None, callbackObject=None, printerProfileManager=None):
         self._logger = logging.getLogger(__name__)
         self._serialLogger = logging.getLogger("SERIAL")
 
         if callbackObject == None:
             callbackObject = MachineComPrintCallback()
 
-        self._authentise_printer_id = authentise_printer_id
+        self._port = port
+        self._baudrate = baudrate
+        self._printer_id = self._settings.get(['printer_id'])
         self._command_uri_queue = comm_helpers.TypedQueue()
 
         self._callback = callbackObject
         self._state = self.STATE_NONE
 
-        self._api_key = api_key
-        self._api_secret = api_secret
+        self._authentise_url = self._settings.get(['authentise_url'])
+        self._api_key = self._settings.get(['api_key'])
+        self._api_secret = self._settings.get(['api_secret'])
 
         self._temp = {}
         self._bedTemp = None
@@ -58,8 +48,16 @@ class AuthentiseMachineCom(object):
         self.monitoring_thread.daemon = True
         self.monitoring_thread.start()
 
-    def __del__(self):
-        self.close()
+        self._on_connected()
+
+    def _on_connected(self):
+        self._temperature_timer = RepeatedTimer(lambda: comm_helpers.get_interval("temperature", default_value=4.0), self._poll_temperature, run_first=True)
+        self._temperature_timer.start()
+
+        payload = dict(port=self._port, baudrate=self._baudrate)
+        self._changeState(self.STATE_OPERATIONAL)
+
+        eventManager().fire(Events.CONNECTED, payload)
 
     ##~~ internal state management
 
@@ -133,7 +131,7 @@ class AuthentiseMachineCom(object):
         return self.isPrinting() or self.isPaused()
 
     def isSdReady(self):
-        return self._sdAvailable
+        return
 
     def getPrintProgress(self):
         #TODO: Add print progress status updates
@@ -162,17 +160,9 @@ class AuthentiseMachineCom(object):
         return 0
 
     def getConnection(self):
-        return self._authentise_printer_id
+        return self._printer_id
 
     ##~~ external interface
-
-    def on_connected(self):
-        self._temperature_timer = RepeatedTimer(lambda: comm_helpers.get_interval("temperature", default_value=4.0), self._poll_temperature, run_first=True)
-        self._temperature_timer.start()
-
-        self._changeState(self.STATE_OPERATIONAL)
-
-        eventManager().fire(Events.CONNECTED, None)
 
     def close(self, isError = False):
         if self._temperature_timer is not None:
@@ -205,7 +195,7 @@ class AuthentiseMachineCom(object):
 
         if self.isPrinting() or self.isOperational():
             data = {'command': cmd}
-            printer_command_url = urlparse.urljoin(AUTHENTISE_URL, 'printer/instance/{}/command/'.format(self._authentise_printer_id))
+            printer_command_url = urlparse.urljoin(self._authentise_url, 'printer/instance/{}/command/'.format(self._printer_id))
             response = requests.post(printer_command_url, json=data, auth=(self._api_key, self._api_secret))
             if not response.ok:
                 self._log('Warning: Got invalid response {}: {} for {}: {}'.format(response.status_code, response.content, response.request.url, response.request.body))

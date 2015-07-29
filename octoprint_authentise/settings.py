@@ -9,4 +9,6 @@ class SettingsPlugin(octoprint.plugin.SettingsPlugin):
             api_key=None,
             api_secret=None,
             claimed_by=None,
+            authentise_url='https://print.authentise.com',
+            printer_id=None,
         )
