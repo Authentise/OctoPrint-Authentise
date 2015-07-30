@@ -8,7 +8,7 @@ from octoprint_authentise import helpers
 
 class BlueprintPlugin(octoprint.plugin.BlueprintPlugin):
     @octoprint.plugin.BlueprintPlugin.route("/connect/", methods=["POST"])
-    def connect(self):
+    def blueprint_connect(self):
         username = flask.request.json.get('username')
         password = flask.request.json.get('password')
 

@@ -13,7 +13,7 @@ class AuthentisePlugin(
     asset.AssetPlugin,
     blueprint.BlueprintPlugin,
     update.UpdatePlugin,
-    comm.AuthentiseMachineCom,
+    comm.MachineCom,
 ):
     pass
 

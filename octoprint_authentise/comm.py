@@ -14,33 +14,64 @@ from octoprint.util import get_exception_string, RepeatedTimer, comm_helpers
 import octoprint.plugin
 
 
-class AuthentiseMachineCom(octoprint.plugin.MachineComPlugin):
-    def startup(self, port = None, baudrate=None, callbackObject=None, printerProfileManager=None):
+class MachineCom(octoprint.plugin.MachineComPlugin):
+    _logger = None
+    _serialLogger = None
+
+    _state = None
+
+    _port = None
+    _baudrate = None
+    _printer_id = None
+
+    _authentise_model = None
+
+    _authentise_url = None
+    _api_key = None
+    _api_secret = None
+
+    _command_uri_queue = None
+
+    _temp = {}
+    _bedTemp = None
+    _temperature_timer = None
+
+    _callback = None
+    _printer_profile_manager = None
+
+    def __init__(self):
         self._logger = logging.getLogger(__name__)
         self._serialLogger = logging.getLogger("SERIAL")
 
+        self._command_uri_queue = comm_helpers.TypedQueue()
+
+        self._state = self.STATE_NONE
+
+    def startup(self, callbackObject=None, printerProfileManager=None):
         if callbackObject == None:
             callbackObject = MachineComPrintCallback()
 
-        self._port = port
-        self._baudrate = baudrate
-        self._printer_id = self._settings.get(['printer_id'])
-        self._command_uri_queue = comm_helpers.TypedQueue()
-
         self._callback = callbackObject
-        self._state = self.STATE_NONE
+
+        self._printer_profile_manager = printerProfileManager
 
         self._authentise_url = self._settings.get(['authentise_url'])
         self._api_key = self._settings.get(['api_key'])
         self._api_secret = self._settings.get(['api_secret'])
 
-        self._temp = {}
-        self._bedTemp = None
+    def connect(self, port=None, baudrate=None):
+        if port == None:
+            port = settings().get(["serial", "port"])
+        if baudrate == None:
+            settings_baudrate = settings().getInt(["serial", "baudrate"])
+            if settings_baudrate is None:
+                baudrate = 0
+            else:
+                baudrate = settings_baudrate
 
-        self._temperature_timer = None
-
-        # print job
-        self._authentise_model = None
+        self._port = port
+        self._baudrate = baudrate
+        self._printer_id = self._settings.get(['printer_id'])
 
         # monitoring thread
         self._monitoring_active = True
@@ -48,9 +79,6 @@ class AuthentiseMachineCom(octoprint.plugin.MachineComPlugin):
         self.monitoring_thread.daemon = True
         self.monitoring_thread.start()
 
-        self._on_connected()
-
-    def _on_connected(self):
         self._temperature_timer = RepeatedTimer(lambda: comm_helpers.get_interval("temperature", default_value=4.0), self._poll_temperature, run_first=True)
         self._temperature_timer.start()
 
@@ -348,14 +376,12 @@ class AuthentiseMachineCom(octoprint.plugin.MachineComPlugin):
 
             except:
                 self._logger.exception("Something crashed inside the serial connection loop, please report this in OctoPrint's bug tracker:")
-
                 errorMsg = "See octoprint.log for details"
                 self._log(errorMsg)
                 self._errorValue = errorMsg
                 self._changeState(self.STATE_ERROR)
                 eventManager().fire(Events.ERROR, {"error": self.getErrorString()})
         self._log("Connection closed, closing down monitor")
-
 
     def _poll_temperature(self):
         if self.isOperational():
