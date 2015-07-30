@@ -7,14 +7,15 @@ from uuid import uuid4
 
 import requests
 
-# AUTHENTISE_CLIENT_PATH = 'authentise-streaming-client'
-AUTHENTISE_CLIENT_PATH = '/Applications/Authentise.app/Contents/Resources/streamus-client'
+STREAMUS_CLIENT_PATH = '/Applications/Authentise.app/Contents/Resources/streamus-client'
+AUTHENTISE_CLIENT_PATH = '/Applications/Authentise.app/Contents/MacOS/authentise'
+AUTHENTISE_CLIENT_CONFIG = '/Applications/Authentise.app/Contents/Resources/client.conf'
 AUTHENTISE_PRINT_API = 'https://print.dev-auth.com'
 AUTHENTISE_USER_API = 'https://users.dev-auth.com'
 
 def run_client(arg, logger):
     command = (
-        AUTHENTISE_CLIENT_PATH, '--logging-level', 'error',
+        STREAMUS_CLIENT_PATH, '--logging-level', 'error',
         '-c',
         '/Applications/Authentise.app/Contents/Resources/client.conf',
         arg,
@@ -25,6 +26,13 @@ def run_client(arg, logger):
     except subprocess.CalledProcessError as exception:
         logger.error("Error running client command `%s` using parameters: %s", exception, arg)
         return
+
+def start_authentise():
+    command = [AUTHENTISE_CLIENT_PATH, '--config', AUTHENTISE_CLIENT_CONFIG]
+
+    process = subprocess.Popen(command)
+
+    return process.pid
 
 def claim_node(node_uuid, api_key, api_secret, logger):
     if not node_uuid:
