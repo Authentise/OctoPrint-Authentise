@@ -1,43 +1,47 @@
 import logging
 import pytest
 import httpretty as HTTPretty
-from octoprint_authentise.printer import AuthentisePrinter
+from octoprint_authentise.comm import MachineCom
+from octoprint_authentise import AuthentisePlugin
 import octoprint.settings
+import octoprint.plugin
 
 LOGGER = logging.getLogger(__name__)
+logging.basicConfig()
 
-@pytest.fixture
-def create_printer(mocker):
-    def __inner():
-        mocker.patch('octoprint.plugin.plugin_manager', return_value=mocker.Mock())
+@pytest.yield_fixture
+def settings(mocker):
+    plugin_settings = {
+                'api_key': 'some-key',
+                'api_secret': 'some-secret',
+                'authentise_url': 'https://not-a-real-url.com/',
+                }
 
-        file_manager = mocker.Mock()
-        analysis_queue = mocker.Mock()
-        printer_profile_manager = mocker.Mock()
-
-        _printer = AuthentisePrinter()
-        _printer.startup(fileManager=file_manager, analysisQueue=analysis_queue, printerProfileManager=printer_profile_manager)
-        return _printer
-    return __inner
-
-@pytest.fixture
-def create_settings(mocker):
-    def __inner():
-        mocker.patch('octoprint.settings.Settings.save')
-        _settings = octoprint.settings.settings(init=True, basedir='.')
-        return _settings
-    return __inner
-
-@pytest.fixture
-def printer(create_printer, settings):
-    return create_printer()
-
-@pytest.fixture
-def settings(create_settings):
     default_settings = octoprint.settings.default_settings
-    default_settings['plugins']['authentise'] = {'api_key': 'some-key', 'api_secret': 'some-secret'}
-    _settings = create_settings()
-    return _settings
+    default_settings['plugins']['authentise'] = plugin_settings
+    mocker.patch('octoprint.settings.Settings.save')
+    octoprint.settings.settings(init=True, basedir='.')
+    _settings = octoprint.plugin.plugin_settings('authentise', defaults=plugin_settings)
+    yield _settings
+    octoprint.settings._instance = None
+
+@pytest.fixture
+def plugin(settings, mocker):
+    _plugin = AuthentisePlugin()
+    _plugin._settings = settings
+    return _plugin
+
+@pytest.yield_fixture
+def comm(plugin, mocker):
+    mocker.patch('octoprint.plugin.plugin_manager', return_value=mocker.Mock())
+
+    callback = mocker.Mock()
+    printer_profile_manager = mocker.Mock()
+
+    plugin.startup(callbackObject=callback, printerProfileManager=printer_profile_manager)
+
+    yield plugin
+    plugin.close()
 
 @pytest.yield_fixture
 def httpretty():
