@@ -14,6 +14,9 @@ def test_printer_connect_create_authentise_printer(comm, httpretty, mocker, sett
     # keep authentise from actually starting
     mocker.patch("octoprint_authentise.helpers.start_authentise", return_value=1234)
 
+    # keep authentise from actually starting
+    mocker.patch("octoprint_authentise.helpers.run_client", return_value="you're-a-wizard-harry")
+
     comm.connect(port="1234", baudrate=5678)
 
     assert comm.isOperational()
