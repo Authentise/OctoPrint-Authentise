@@ -96,7 +96,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
         eventManager().fire(Events.CONNECTED, payload)
 
     def _get_or_create_printer(self, port, baud_rate):
-        url = '{}/printer/instance/'.format(self._authentise_url)
+        url = urlparse.urljoin(self._authentise_url, '/printer/instance/')
         target_printer = None
 
         printer_get_resp = requests.get(url=url, auth=(self._api_key, self._api_secret))

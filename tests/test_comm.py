@@ -1,15 +1,19 @@
-import httpretty
 import json
+from urlparse import urljoin
+
+import httpretty
 
 
 # tests case in which the user has no authentise printers
 def test_printer_connect_create_authentise_printer(comm, httpretty, mocker, settings):
-    httpretty.register_uri(httpretty.GET, "{}/printer/instance/".format(settings.get(["authentise_url"])),
+    url = urljoin(settings.get(["authentise_url"]), "/printer/instance/")
+    httpretty.register_uri(httpretty.GET,
+                           url,
                            body='[]',
                            content_type='application/json')
 
-    httpretty.register_uri(httpretty.POST, "{}/printer/instance/".format(settings.get(["authentise_url"])),
-                           adding_headers={"Location": "{}/abc-123/".format(settings.get(["authentise_url"]))})
+    httpretty.register_uri(httpretty.POST, url,
+                           adding_headers={"Location": urljoin(url, "/abc-123/")})
 
     # keep authentise from actually starting
     mocker.patch("octoprint_authentise.helpers.start_authentise", return_value=1234)
@@ -29,17 +33,19 @@ def test_printer_connect_create_authentise_printer(comm, httpretty, mocker, sett
 
 # tests case in which the user has a printer on the right port, but the baud rate is wrong
 def test_printer_connect_get_authentise_printer(comm, httpretty, mocker, settings):
-    printer_uri = "{}/printer/instance/abc-123/".format(settings.get(["authentise_url"]))
+    url = urljoin(settings.get(["authentise_url"]), "/printer/instance/")
+    printer_uri = urljoin(url, "/abc-123/")
     printers_payload = [{"baud": 250000,
                          "port": "/dev/tty.derp",
                          "uri": printer_uri}]
 
-    httpretty.register_uri(httpretty.GET, "{}/printer/instance/".format(settings.get(["authentise_url"])),
-                           body=json.dumps(printers_payload),
+    httpretty.register_uri(httpretty.GET,
+                           url,
+                           body='[]',
                            content_type='application/json')
 
-    httpretty.register_uri(httpretty.POST, settings.get(["authentise_url"]),
-                           adding_headers={"Location": printer_uri})
+    httpretty.register_uri(httpretty.POST, url,
+                           adding_headers={"Location": urljoin(url, "/abc-123/")})
 
     httpretty.register_uri(httpretty.PUT, printer_uri)
 
@@ -59,12 +65,14 @@ def test_printer_connect_get_authentise_printer(comm, httpretty, mocker, setting
 
 # tests case in which port and baud rate are just right
 def test_printer_connect_get_authentise_printer_no_put(comm, httpretty, mocker, settings):
-    printer_uri = "{}/printer/instance/abc-123/".format(settings.get(["authentise_url"]))
+    url = urljoin(settings.get(["authentise_url"]), "/printer/instance/")
+    printer_uri = urljoin(url, "/abc-123/")
     printers_payload = [{"baud": 250000,
                          "port": "/dev/tty.derp",
                          "uri": printer_uri}]
 
-    httpretty.register_uri(httpretty.GET, "{}/printer/instance/".format(settings.get(["authentise_url"])),
+    httpretty.register_uri(httpretty.GET,
+                           url,
                            body=json.dumps(printers_payload),
                            content_type='application/json')
 

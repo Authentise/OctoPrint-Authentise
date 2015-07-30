@@ -14,7 +14,7 @@ def settings(mocker):
     plugin_settings = {
                 'api_key': 'some-key',
                 'api_secret': 'some-secret',
-                'authentise_url': 'https://not-a-real-url.com',
+                'authentise_url': 'https://not-a-real-url.com/',
                 }
 
     default_settings = octoprint.settings.default_settings
