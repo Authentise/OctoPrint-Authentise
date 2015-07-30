@@ -1,17 +1,22 @@
 # coding=utf-8
 from __future__ import absolute_import
+
+import logging
+import threading
+import urlparse
+
+import octoprint.plugin
+import requests
+from octoprint.events import Events, eventManager
+from octoprint.util import RepeatedTimer, comm_helpers, get_exception_string
+
+from octoprint_authentise import helpers
+
 __author__ = "Scott Lemmon <scott@authentise.com> based on work by Gina Häußge"
 __license__ = "GNU Affero General Public License http://www.gnu.org/licenses/agpl.html"
 __copyright__ = "Copyright (C) 2015 Authentise - Released under terms of the AGPLv3 License"
 
-import logging
-import requests
-import threading
-import urlparse
 
-from octoprint.events import eventManager, Events
-from octoprint.util import get_exception_string, RepeatedTimer, comm_helpers
-import octoprint.plugin
 
 
 class MachineCom(octoprint.plugin.MachineComPlugin):
