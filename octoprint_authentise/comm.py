@@ -223,7 +223,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
         return 0
 
     def getConnection(self):
-        return self._printer_uri
+        return self._port, self._baudrate
 
     ##~~ external interface
 
