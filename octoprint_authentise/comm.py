@@ -52,6 +52,8 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
 
         self._state = self.STATE_NONE
 
+        self._authentise_process = None
+
     def startup(self, callbackObject=None, printerProfileManager=None):
         if callbackObject == None:
             callbackObject = MachineComPrintCallback()
@@ -78,7 +80,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
         self._baudrate = baudrate
         self._printer_uri = self._get_or_create_printer(port, baudrate)
 
-        helpers.start_authentise()
+        self._authentise_process = helpers.run_client()
 
 
         # monitoring thread
@@ -112,9 +114,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
 
             return target_printer['uri']
         else:
-            node_uuid = helpers.run_client('--node-uuid', self._logger)
-
-            payload = {'client': node_uuid,
+            payload = {'client': self.node_uuid,
                        'printer_model': 'https://print.authentise.com/printer/model/9/',
                        'name': '',
                        'port': port,

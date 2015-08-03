@@ -16,26 +16,24 @@ STREAMUS_CONFIG_PATH = SETTINGS.get_settings_defaults()["streamus_config_path"]
 AUTHENTISE_PRINT_API = SETTINGS.get_settings_defaults()["authentise_url"]
 AUTHENTISE_USER_API = SETTINGS.get_settings_defaults()["authentise_user_url"]
 
-def run_client(arg, logger):
-    command = (
-        STREAMUS_CLIENT_PATH, '--logging-level', 'error',
-        '-c',
-        '/Applications/Authentise.app/Contents/Resources/client.conf',
-        arg,
-    )
-
+def run_client_and_wait(logger, args=""):
     try:
-        return subprocess.check_output(command).strip()
+        process = run_client(args)
+        output, _ = process.communicate()
+        return output.strip()
     except subprocess.CalledProcessError as exception:
-        logger.error("Error running client command `%s` using parameters: %s", exception, arg)
+        logger.error("Error running client command `%s` using parameters: %s", exception, args)
         return
 
-def start_authentise():
-    command = [STREAMUS_CLIENT_PATH, '--config', STREAMUS_CONFIG_PATH]
+def run_client(args=""):
+    command = (
+        STREAMUS_CLIENT_PATH,
+        '--logging-level', 'error',
+        '-c', '/Applications/Authentise.app/Contents/Resources/client.conf',
+        args,
+    )
 
-    process = subprocess.check_output(command)
-
-    return process.pid
+    return subprocess.Popen(command, stdout=subprocess.PIPE)
 
 def claim_node(node_uuid, api_key, api_secret, logger):
     if not node_uuid:
@@ -50,7 +48,7 @@ def claim_node(node_uuid, api_key, api_secret, logger):
         logger.error("No API secret available to claim node")
         return False
 
-    claim_code = run_client('--connection-code', logger)
+    claim_code = run_client_and_wait(args='--connection-code', logger=logger)
     if claim_code:
         logger.info("Got claim code: %s", claim_code)
     else:

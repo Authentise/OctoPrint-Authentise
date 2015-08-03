@@ -6,7 +6,10 @@ import httpretty
 
 # tests case in which the user has no authentise printers
 def test_printer_connect_create_authentise_printer(comm, httpretty, mocker, settings):
+    comm.node_uuid = "youre-a-wizard-harry"
+
     url = urljoin(settings.get(["authentise_url"]), "/printer/instance/")
+
     httpretty.register_uri(httpretty.GET,
                            url,
                            body='[]',
@@ -16,10 +19,7 @@ def test_printer_connect_create_authentise_printer(comm, httpretty, mocker, sett
                            adding_headers={"Location": urljoin(url, "abc-123/")})
 
     # keep authentise from actually starting
-    mocker.patch("octoprint_authentise.helpers.start_authentise", return_value=1234)
-
-    # keep authentise from actually starting
-    mocker.patch("octoprint_authentise.helpers.run_client", return_value="you're-a-wizard-harry")
+    mocker.patch("octoprint_authentise.helpers.run_client", return_value=1234)
 
     comm.connect(port="1234", baudrate=5678)
 
@@ -34,6 +34,7 @@ def test_printer_connect_create_authentise_printer(comm, httpretty, mocker, sett
 
 # tests case in which the user has a printer on the right port, but the baud rate is wrong
 def test_printer_connect_get_authentise_printer(comm, httpretty, mocker, settings):
+    comm.node_uuid = "youre-a-wizard-harry"
     url = urljoin(settings.get(["authentise_url"]), "/printer/instance/")
     printer_uri = urljoin(url, "/abc-123/")
     printers_payload = [{"baud": 250000,
@@ -52,10 +53,7 @@ def test_printer_connect_get_authentise_printer(comm, httpretty, mocker, setting
 
 
     # keep authentise from actually starting
-    mocker.patch("octoprint_authentise.helpers.start_authentise", return_value=1234)
-
-    mocker.patch("octoprint_authentise.helpers.run_client", return_value="you're-a-wizard-harry")
-
+    mocker.patch("octoprint_authentise.helpers.run_client", return_value=1234)
 
     comm.connect(port="/dev/tty.derp", baudrate=5678)
 
@@ -68,9 +66,9 @@ def test_printer_connect_get_authentise_printer(comm, httpretty, mocker, setting
     assert comm._printer_uri == urljoin(url, "abc-123/")
 
 
-
 # tests case in which port and baud rate are just right
 def test_printer_connect_get_authentise_printer_no_put(comm, httpretty, mocker, settings):
+    comm.node_uuid = "youre-a-wizard-harry"
     url = urljoin(settings.get(["authentise_url"]), "/printer/instance/")
     printer_uri = urljoin(url, "abc-123/")
     printers_payload = [{"baud": 250000,
@@ -83,7 +81,7 @@ def test_printer_connect_get_authentise_printer_no_put(comm, httpretty, mocker, 
                            content_type='application/json')
 
     # keep authentise from actually starting
-    mocker.patch("octoprint_authentise.helpers.start_authentise", return_value=1234)
+    mocker.patch("octoprint_authentise.helpers.run_client", return_value=1234)
 
     comm.connect(port="/dev/tty.derp", baudrate=250000)
 
