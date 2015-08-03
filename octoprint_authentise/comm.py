@@ -1,17 +1,22 @@
 # coding=utf-8
 from __future__ import absolute_import
+
+import logging
+import threading
+import urlparse
+
+import octoprint.plugin
+import requests
+from octoprint.events import Events, eventManager
+from octoprint.util import RepeatedTimer, comm_helpers, get_exception_string
+
+from octoprint_authentise import helpers
+
 __author__ = "Scott Lemmon <scott@authentise.com> based on work by Gina Häußge"
 __license__ = "GNU Affero General Public License http://www.gnu.org/licenses/agpl.html"
 __copyright__ = "Copyright (C) 2015 Authentise - Released under terms of the AGPLv3 License"
 
-import logging
-import requests
-import threading
-import urlparse
 
-from octoprint.events import eventManager, Events
-from octoprint.util import get_exception_string, RepeatedTimer, comm_helpers
-import octoprint.plugin
 
 
 class MachineCom(octoprint.plugin.MachineComPlugin):
@@ -22,7 +27,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
 
     _port = None
     _baudrate = None
-    _printer_id = None
+    _printer_uri = None
 
     _authentise_model = None
 
@@ -46,6 +51,8 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
         self._command_uri_queue = comm_helpers.TypedQueue()
 
         self._state = self.STATE_NONE
+
+        self._authentise_process = None
 
     def startup(self, callbackObject=None, printerProfileManager=None):
         if callbackObject == None:
@@ -71,7 +78,10 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
 
         self._port = port
         self._baudrate = baudrate
-        self._printer_id = self._settings.get(['printer_id'])
+        self._printer_uri = self._get_or_create_printer(port, baudrate)
+
+        self._authentise_process = helpers.run_client()
+
 
         # monitoring thread
         self._monitoring_active = True
@@ -86,6 +96,31 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
         self._changeState(self.STATE_OPERATIONAL)
 
         eventManager().fire(Events.CONNECTED, payload)
+
+    def _get_or_create_printer(self, port, baud_rate):
+        url = urlparse.urljoin(self._authentise_url, '/printer/instance/')
+        target_printer = None
+
+        printer_get_resp = requests.get(url=url, auth=(self._api_key, self._api_secret))
+
+        for printer in printer_get_resp.json():
+            if printer['port'] == port:
+                target_printer = printer
+                break
+
+        if target_printer:
+            if target_printer['baud'] != baud_rate:
+                requests.put(target_printer["uri"], json={'baud_rate': baud_rate})
+
+            return target_printer['uri']
+        else:
+            payload = {'client': self.node_uuid,
+                       'printer_model': 'https://print.authentise.com/printer/model/9/',
+                       'name': '',
+                       'port': port,
+                       'baud_rate': baud_rate}
+            create_printer_resp = requests.post(url, json=payload)
+            return create_printer_resp.headers["Location"]
 
     ##~~ internal state management
 
@@ -223,7 +258,8 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
 
         if self.isPrinting() or self.isOperational():
             data = {'command': cmd}
-            printer_command_url = urlparse.urljoin(self._authentise_url, 'printer/instance/{}/command/'.format(self._printer_id))
+            printer_command_url = urlparse.urljoin(self._printer_uri, 'command/')
+
             response = requests.post(printer_command_url, json=data, auth=(self._api_key, self._api_secret))
             if not response.ok:
                 self._log('Warning: Got invalid response {}: {} for {}: {}'.format(response.status_code, response.content, response.request.url, response.request.body))
@@ -386,4 +422,3 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
     def _poll_temperature(self):
         if self.isOperational():
             self.sendCommand("M105", cmd_type="temperature_poll")
-

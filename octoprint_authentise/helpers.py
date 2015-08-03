@@ -7,24 +7,33 @@ from uuid import uuid4
 
 import requests
 
-# AUTHENTISE_CLIENT_PATH = 'authentise-streaming-client'
-AUTHENTISE_CLIENT_PATH = '/Applications/Authentise.app/Contents/Resources/streamus-client'
-AUTHENTISE_PRINT_API = 'https://print.dev-auth.com'
-AUTHENTISE_USER_API = 'https://users.dev-auth.com'
+from octoprint_authentise.settings import SettingsPlugin
 
-def run_client(arg, logger):
+SETTINGS = SettingsPlugin()
+
+STREAMUS_CLIENT_PATH = SETTINGS.get_settings_defaults()["streamus_client_path"]
+STREAMUS_CONFIG_PATH = SETTINGS.get_settings_defaults()["streamus_config_path"]
+AUTHENTISE_PRINT_API = SETTINGS.get_settings_defaults()["authentise_url"]
+AUTHENTISE_USER_API = SETTINGS.get_settings_defaults()["authentise_user_url"]
+
+def run_client_and_wait(logger, args=""):
+    try:
+        process = run_client(args)
+        output, _ = process.communicate()
+        return output.strip()
+    except subprocess.CalledProcessError as exception:
+        logger.error("Error running client command `%s` using parameters: %s", exception, args)
+        return
+
+def run_client(args=""):
     command = (
-        AUTHENTISE_CLIENT_PATH, '--logging-level', 'error',
-        '-c',
-        '/Applications/Authentise.app/Contents/Resources/client.conf',
-        arg,
+        STREAMUS_CLIENT_PATH,
+        '--logging-level', 'error',
+        '-c', '/Applications/Authentise.app/Contents/Resources/client.conf',
+        args,
     )
 
-    try:
-        return subprocess.check_output(command).strip()
-    except subprocess.CalledProcessError as exception:
-        logger.error("Error running client command `%s` using parameters: %s", exception, arg)
-        return
+    return subprocess.Popen(command, stdout=subprocess.PIPE)
 
 def claim_node(node_uuid, api_key, api_secret, logger):
     if not node_uuid:
@@ -39,7 +48,7 @@ def claim_node(node_uuid, api_key, api_secret, logger):
         logger.error("No API secret available to claim node")
         return False
 
-    claim_code = run_client('--connection-code', logger)
+    claim_code = run_client_and_wait(args='--connection-code', logger=logger)
     if claim_code:
         logger.info("Got claim code: %s", claim_code)
     else:
