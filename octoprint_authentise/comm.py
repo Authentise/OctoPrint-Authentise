@@ -110,7 +110,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
             if target_printer['baud'] != baud_rate:
                 requests.put(target_printer["uri"], json={'baud_rate': baud_rate})
 
-            return target_printer['uri'] #TODO: make sure this is the actual data structure
+            return target_printer['uri']
         else:
             node_uuid = helpers.run_client('--node-uuid', self._logger)
 
@@ -258,7 +258,9 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
 
         if self.isPrinting() or self.isOperational():
             data = {'command': cmd}
-            response = requests.post(self._printer_uri, json=data, auth=(self._api_key, self._api_secret))
+            printer_command_url = urlparse.urljoin(self._printer_uri, 'command/')
+
+            response = requests.post(printer_command_url, json=data, auth=(self._api_key, self._api_secret))
             if not response.ok:
                 self._log('Warning: Got invalid response {}: {} for {}: {}'.format(response.status_code, response.content, response.request.url, response.request.body))
                 return

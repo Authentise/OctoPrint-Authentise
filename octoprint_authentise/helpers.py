@@ -7,11 +7,14 @@ from uuid import uuid4
 
 import requests
 
-STREAMUS_CLIENT_PATH = '/Applications/Authentise.app/Contents/Resources/streamus-client'
-AUTHENTISE_CLIENT_PATH = '/Applications/Authentise.app/Contents/MacOS/authentise'
-AUTHENTISE_CLIENT_CONFIG = '/Applications/Authentise.app/Contents/Resources/client.conf'
-AUTHENTISE_PRINT_API = 'https://print.dev-auth.com'
-AUTHENTISE_USER_API = 'https://users.dev-auth.com'
+from octoprint_authentise.settings import SettingsPlugin
+
+SETTINGS = SettingsPlugin()
+
+STREAMUS_CLIENT_PATH = SETTINGS.get_settings_defaults()["streamus_client_path"]
+STREAMUS_CONFIG_PATH = SETTINGS.get_settings_defaults()["streamus_config_path"]
+AUTHENTISE_PRINT_API = SETTINGS.get_settings_defaults()["authentise_url"]
+AUTHENTISE_USER_API = SETTINGS.get_settings_defaults()["authentise_user_url"]
 
 def run_client(arg, logger):
     command = (
@@ -28,9 +31,9 @@ def run_client(arg, logger):
         return
 
 def start_authentise():
-    command = [AUTHENTISE_CLIENT_PATH, '--config', AUTHENTISE_CLIENT_CONFIG]
+    command = [STREAMUS_CLIENT_PATH, '--config', STREAMUS_CONFIG_PATH]
 
-    process = subprocess.Popen(command)
+    process = subprocess.check_output(command)
 
     return process.pid
 
