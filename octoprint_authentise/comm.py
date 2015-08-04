@@ -1,13 +1,16 @@
 # coding=utf-8
 from __future__ import absolute_import
 
+import Queue
 import logging
+import re
+import requests
 import threading
+import time
 import urlparse
 from urllib import quote_plus
 
 import octoprint.plugin
-import requests
 from octoprint.events import Events, eventManager
 from octoprint.util import RepeatedTimer, comm_helpers, get_exception_string
 
@@ -18,6 +21,46 @@ __license__ = "GNU Affero General Public License http://www.gnu.org/licenses/agp
 __copyright__ = "Copyright (C) 2015 Authentise - Released under terms of the AGPLv3 License"
 
 
+
+FLOAT_RE = r'[-+]?\d*\.?\d+'
+JUNK_RE = r'(?:\s+.*?\s*)?'
+TEMP_RE = re.compile(
+        r'^.*\s*T:\s*(?P<T>{float})(?:\s*/(?P<TT>{float}))?'
+        r'(?:{junk}\s*B:\s*(?P<B>{float})(?:\s*/(?P<TB>{float}))?)?'
+        r'(?:{junk}\s*T0:\s*(?P<T0>{float})(?:\s*/(?P<TT0>{float}))?)?'
+        r'(?:{junk}\s*T1:\s*(?P<T1>{float})(?:\s*/(?P<TT1>{float}))?)?'
+        r'{junk}$'.format(float=FLOAT_RE, junk=JUNK_RE)
+)
+def parse_temps(line):
+    def _cast_to_float(value):
+        if value:
+            try:
+                return float(value)
+            except ValueError:
+                return
+
+    match = TEMP_RE.match(line)
+    if not match:
+        return
+
+    tools = []
+    bed = None
+
+    tool0_actual = _cast_to_float(match.group('T0') or match.group('T'))
+    tool0_target = _cast_to_float(match.group('TT0') or match.group('TT'))
+    tools.append({'actual': tool0_actual, 'target': tool0_target})
+
+    tool1_actual = _cast_to_float(match.group('T1'))
+    tool1_target = _cast_to_float(match.group('TT1'))
+    if tool1_actual:
+        tools.append({'actual': tool1_actual, 'target': tool1_target})
+
+    bed_actual = _cast_to_float(match.group('B'))
+    bed_target = _cast_to_float(match.group('TB'))
+    if bed_actual:
+        bed = {'actual': bed_actual, 'target': bed_target}
+
+    return {'tools': tools, 'bed': bed}
 
 
 class MachineCom(octoprint.plugin.MachineComPlugin):
@@ -273,7 +316,11 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
 
             self._log('Sent {} to {} with response {}: {}'.format(response.request.body, response.request.url, response.status_code, response.content))
             command_uri = response.headers['Location']
-            self._command_uri_queue.put({'uri': command_uri, 'tries': 0})
+            self._command_uri_queue.put({
+                'uri'           : command_uri,
+                'start_time'    : time.time(),
+                'previous_time' : None,
+            })
 
     def startPrint(self):
         if not self.isOperational() or self.isPrinting():
@@ -393,27 +440,68 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
 
     ##~~ Serial monitor processing received messages
 
-    def _monitor_loop(self):
-        def _readline():
-            #TODO: read the response from command uri in the command uri queue
-            # if the response is older that 2 minutes, pop it from the queue    
-            # if the response has a gcode response, return it and pop it from the queue
-            # also should probably check if the command is a temp command
-            #   and throw the updated temp event accordingly
+    def _readline(self):
+        def _put_command_on_queue(data, start_time_diff):
+            if start_time_diff < 120:
+                self._command_uri_queue.put(data)
+
+        current_time = time.time()
+
+        try:
+            command = self._command_uri_queue.get_nowait()
+        except Queue.Empty:
             return ''
+
+        # self._log('Popped: {} from queue'.format(command))
+
+        start_time    = command['start_time']
+        previous_time = command['previous_time']
+        command_uri   = command['uri']
+
+        start_time_diff = current_time - start_time
+        previous_time_diff = (current_time - previous_time) if previous_time else start_time_diff
+
+        if previous_time_diff < 2:
+            _put_command_on_queue({
+                'uri'           : command_uri,
+                'start_time'    : start_time,
+                'previous_time' : previous_time,
+            }, start_time_diff)
+            return ''
+
+        response = requests.get(command_uri, auth=(self._api_key, self._api_secret))
+
+        if response.ok and response.json()['status'] in ['error', 'printer_offline']:
+            return ''
+        elif not response.ok or response.json()['status'] != 'ok':
+            _put_command_on_queue({
+                'uri'           : command_uri,
+                'start_time'    : start_time,
+                'previous_time' : current_time,
+            }, start_time_diff)
+            return ''
+
+        command_response = response.json()
+        self._log('Got response: {}, for command: {}'.format(command_response['response'], command_response['command']))
+        return command_response['response']
+
+    def _monitor_loop(self):
 
         self._log("Connected, starting monitor")
 
+        previous_time = time.time()
         while self._monitoring_active:
             try:
-                line = _readline()
+                line = self._readline()
+
                 if not line:
                     continue
 
-                #TODO: if the line is a temp line:
-                if 'T:' in line: #this is probably totally wrong
-                    self._callback.on_comm_temperature_update(self._temp, self._bedTemp)
-                self._log(line)
+                temps = parse_temps(line)
+                if temps:
+                    tool_temps = {i: [temp['actual'], temp['target']] for i, temp in enumerate(temps['tools'])}
+                    bed_temp = (temps['bed']['actual'], temps['bed']['target']) if temps['bed'] else None
+                    self._callback.on_comm_temperature_update(tool_temps, bed_temp)
                 self._callback.on_comm_message(line)
 
             except:
@@ -423,6 +511,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
                 self._errorValue = errorMsg
                 self._changeState(self.STATE_ERROR)
                 eventManager().fire(Events.ERROR, {"error": self.getErrorString()})
+            time.sleep(0.1)
         self._log("Connection closed, closing down monitor")
 
     def _poll_temperature(self):
