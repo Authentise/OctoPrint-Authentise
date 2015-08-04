@@ -32,7 +32,7 @@ class BlueprintPlugin(octoprint.plugin.BlueprintPlugin):
 
     @octoprint.plugin.BlueprintPlugin.route("/node/", methods=["GET"])
     def get_node(self):
-        connection_code = helpers.run_client('--connection-code', self._logger)
+        connection_code = helpers.run_client_and_wait(args='--connection-code', logger=self._logger)
         if connection_code:
             self._logger.info("Found node connection code: %s", connection_code)
             results = {

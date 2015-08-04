@@ -1,3 +1,6 @@
+import json
+from urlparse import urljoin
+
 import httpretty
 import json
 import pytest
@@ -5,12 +8,25 @@ import Queue
 
 from octoprint_authentise import comm as _comm
 
-def test_comm_startup(comm, httpretty):
-    httpretty.register_uri(httpretty.GET, 'https://print.authentise.com/printer/instance/',
-                           body='',
+
+# tests case in which the user has no authentise printers
+def test_printer_connect_create_authentise_printer(comm, httpretty, mocker, settings):
+    comm.node_uuid = "youre-a-wizard-harry"
+
+    url = urljoin(settings.get(["authentise_url"]), "/printer/instance/")
+
+    httpretty.register_uri(httpretty.GET,
+                           url,
+                           body=json.dumps({"resources": []}),
                            content_type='application/json')
 
-    comm.connect(port=1234, baudrate=5678)
+    httpretty.register_uri(httpretty.POST, url,
+                           adding_headers={"Location": urljoin(url, "abc-123/")})
+
+    # keep authentise from actually starting
+    mocker.patch("octoprint_authentise.helpers.run_client")
+
+    comm.connect(port="1234", baudrate=5678)
 
     assert comm.isOperational()
     assert not comm.isBusy()
@@ -18,6 +34,69 @@ def test_comm_startup(comm, httpretty):
     assert not comm.isPaused()
     assert not comm.isError()
     assert not comm.isClosedOrError()
+    assert comm._printer_uri == urljoin(url, "abc-123/")
+
+
+# tests case in which the user has a printer on the right port, but the baud rate is wrong
+def test_printer_connect_get_authentise_printer(comm, httpretty, mocker, settings):
+    comm.node_uuid = "youre-a-wizard-harry"
+    url = urljoin(settings.get(["authentise_url"]), "/printer/instance/")
+    printer_uri = urljoin(url, "abc-123/")
+    printers_payload = {"resources": [{"baud": 250000,
+                                       "port": "/dev/tty.derp",
+                                       "uri": printer_uri}]}
+
+    httpretty.register_uri(httpretty.GET,
+                           url,
+                           body=json.dumps(printers_payload),
+                           content_type='application/json')
+
+    httpretty.register_uri(httpretty.POST, url,
+                           adding_headers={"Location": urljoin(url, "abc-123/")})
+
+    httpretty.register_uri(httpretty.PUT, printer_uri)
+
+
+    # keep authentise from actually starting
+    mocker.patch("octoprint_authentise.helpers.run_client")
+
+    comm.connect(port="/dev/tty.derp", baudrate=5678)
+
+    assert comm.isOperational()
+    assert not comm.isBusy()
+    assert not comm.isPrinting()
+    assert not comm.isPaused()
+    assert not comm.isError()
+    assert not comm.isClosedOrError()
+    assert comm._printer_uri == urljoin(url, "abc-123/")
+
+
+# tests case in which port and baud rate are just right
+def test_printer_connect_get_authentise_printer_no_put(comm, httpretty, mocker, settings):
+    comm.node_uuid = "youre-a-wizard-harry"
+    url = urljoin(settings.get(["authentise_url"]), "/printer/instance/")
+    printer_uri = urljoin(url, "abc-123/")
+    printers_payload = {"resources": [{"baud": 250000,
+                                       "port": "/dev/tty.derp",
+                                       "uri": printer_uri}]}
+
+    httpretty.register_uri(httpretty.GET,
+                           url,
+                           body=json.dumps(printers_payload),
+                           content_type='application/json')
+
+    # keep authentise from actually starting
+    mocker.patch("octoprint_authentise.helpers.run_client")
+
+    comm.connect(port="/dev/tty.derp", baudrate=250000)
+
+    assert comm.isOperational()
+    assert not comm.isBusy()
+    assert not comm.isPrinting()
+    assert not comm.isPaused()
+    assert not comm.isError()
+    assert not comm.isClosedOrError()
+    assert comm._printer_uri == urljoin(url, "abc-123/")
 
 @pytest.mark.parametrize("command_queue, response, current_time, expected_return, expected_queue", [
     (
