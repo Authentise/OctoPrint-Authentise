@@ -2,7 +2,9 @@
 from __future__ import absolute_import
 
 import octoprint.plugin
-from octoprint_authentise import blueprint, asset, settings, startup, template, update, comm
+
+from octoprint_authentise import (asset, blueprint, comm, settings, startup,
+                                  template, update)
 
 __plugin_name__ = "Authentise"
 __plugin_implementation__ = None

@@ -9,12 +9,12 @@ import time
 import urlparse
 from urllib import quote_plus
 
-import requests
-
 import octoprint.plugin
+import requests
 from octoprint.events import Events, eventManager
 from octoprint.settings import settings
 from octoprint.util import RepeatedTimer, comm_helpers, get_exception_string
+
 from octoprint_authentise import helpers
 
 __author__ = "Scott Lemmon <scott@authentise.com> based on work by Gina Häußge"

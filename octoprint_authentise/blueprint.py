@@ -5,8 +5,8 @@ from __future__ import absolute_import
 import json
 
 import flask
-
 import octoprint.plugin
+
 from octoprint_authentise import helpers
 
 
