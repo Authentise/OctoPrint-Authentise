@@ -102,7 +102,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
         client_url = urlparse.urljoin(self._authentise_url, '/client/{}/'.format(self.node_uuid))
 
         url = urlparse.urljoin(self._authentise_url,
-                               '/printer/instance/?filter[client]={}'.format(client_url))
+                               '/printer/instance/?filter[client]={}'.format(quote_plus(client_url)))
         target_printer = None
 
         printer_get_resp = requests.get(url=url, auth=(self._api_key, self._api_secret))
