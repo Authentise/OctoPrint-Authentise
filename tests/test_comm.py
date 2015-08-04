@@ -12,7 +12,7 @@ def test_printer_connect_create_authentise_printer(comm, httpretty, mocker, sett
 
     httpretty.register_uri(httpretty.GET,
                            url,
-                           body='[]',
+                           body=json.dumps({"resources": []}),
                            content_type='application/json')
 
     httpretty.register_uri(httpretty.POST, url,
@@ -37,13 +37,13 @@ def test_printer_connect_get_authentise_printer(comm, httpretty, mocker, setting
     comm.node_uuid = "youre-a-wizard-harry"
     url = urljoin(settings.get(["authentise_url"]), "/printer/instance/")
     printer_uri = urljoin(url, "abc-123/")
-    printers_payload = [{"baud": 250000,
-                         "port": "/dev/tty.derp",
-                         "uri": printer_uri}]
+    printers_payload = {"resources": [{"baud": 250000,
+                                       "port": "/dev/tty.derp",
+                                       "uri": printer_uri}]}
 
     httpretty.register_uri(httpretty.GET,
                            url,
-                           body='[]',
+                           body=json.dumps(printers_payload),
                            content_type='application/json')
 
     httpretty.register_uri(httpretty.POST, url,
@@ -71,9 +71,9 @@ def test_printer_connect_get_authentise_printer_no_put(comm, httpretty, mocker, 
     comm.node_uuid = "youre-a-wizard-harry"
     url = urljoin(settings.get(["authentise_url"]), "/printer/instance/")
     printer_uri = urljoin(url, "abc-123/")
-    printers_payload = [{"baud": 250000,
-                         "port": "/dev/tty.derp",
-                         "uri": printer_uri}]
+    printers_payload = {"resources": [{"baud": 250000,
+                                       "port": "/dev/tty.derp",
+                                       "uri": printer_uri}]}
 
     httpretty.register_uri(httpretty.GET,
                            url,

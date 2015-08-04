@@ -4,6 +4,7 @@ from __future__ import absolute_import
 import logging
 import threading
 import urlparse
+from urllib import quote_plus
 
 import octoprint.plugin
 import requests
@@ -98,12 +99,15 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
         eventManager().fire(Events.CONNECTED, payload)
 
     def _get_or_create_printer(self, port, baud_rate):
-        url = urlparse.urljoin(self._authentise_url, '/printer/instance/')
+        client_url = urlparse.urljoin(self._authentise_url, '/client/{}/'.format(self.node_uuid))
+
+        url = urlparse.urljoin(self._authentise_url,
+                               '/printer/instance/?filter[client]={}'.format(client_url))
         target_printer = None
 
         printer_get_resp = requests.get(url=url, auth=(self._api_key, self._api_secret))
 
-        for printer in printer_get_resp.json():
+        for printer in printer_get_resp.json()["resources"]:
             if printer['port'] == port:
                 target_printer = printer
                 break
@@ -119,10 +123,12 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
                        'name': '',
                        'port': port,
                        'baud_rate': baud_rate}
-            create_printer_resp = requests.post(url, json=payload)
+            create_printer_resp = requests.post(urlparse.urljoin(self._authentise_url,
+                                                                 '/printer/instance/'),
+                                                json=payload)
             return create_printer_resp.headers["Location"]
 
-    ##~~ internal state management
+    # #~~ internal state management
 
     def _changeState(self, newState):
         if self._state == newState:
