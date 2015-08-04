@@ -1,13 +1,15 @@
 # coding=utf-8
-from setuptools import setup
 import contextlib
 import imp
 import os
 import re
 import subprocess
+
+from setuptools import setup
+
 try:
     import octoprint_setuptools
-except:
+except: #pylint: disable=bare-except
     print("Could not import OctoPrint's setuptools, are you sure you are running that under "
         "the same python installation that OctoPrint is installed under?")
     import sys
@@ -50,6 +52,9 @@ extra_requires = {
         'pytest==2.7.2',
         'pytest-mock==0.7.0',
         'httpretty==0.8.10',
+        'pylint==1.4.4',
+        'isort==4.0.0',
+        'ipython==3.2.1',
     ]
 }
 
@@ -89,7 +94,7 @@ def _get_output_or_none(args):
         Python 2.6.2
         """
         process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
-        output, unused_err = process.communicate()
+        output, dummy_err = process.communicate()
         retcode = process.poll()
         if retcode:
             cmd = kwargs.get("args")

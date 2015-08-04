@@ -1,10 +1,14 @@
 # coding=utf-8
+#pylint: disable=no-member
 from __future__ import absolute_import
 
-import flask
 import json
+
+import flask
+
 import octoprint.plugin
 from octoprint_authentise import helpers
+
 
 class BlueprintPlugin(octoprint.plugin.BlueprintPlugin):
     @octoprint.plugin.BlueprintPlugin.route("/connect/", methods=["POST"])

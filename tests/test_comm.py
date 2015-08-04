@@ -1,10 +1,9 @@
+#pylint: disable=line-too-long, protected-access
 import json
+import Queue
 from urlparse import urljoin
 
-import httpretty
-import json
 import pytest
-import Queue
 
 from octoprint_authentise import comm as _comm
 
@@ -314,7 +313,7 @@ def test_printer_connect_get_authentise_printer_no_put(comm, httpretty, mocker, 
             'previous_time' : 10,
         },
     ),
-])
+]) #pylint: disable=too-many-arguments
 def test_readline(comm, httpretty, mocker, command_queue, response, current_time, expected_return, expected_queue):
     mocker.patch('time.time', return_value=current_time)
 

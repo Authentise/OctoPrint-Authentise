@@ -1,7 +1,9 @@
 # coding=utf-8
+#pylint: disable=no-member, too-few-public-methods
 from __future__ import absolute_import
 
-class UpdatePlugin():
+
+class UpdatePlugin(object):
     def get_update_information(self):
         return dict(
             authentise=dict(

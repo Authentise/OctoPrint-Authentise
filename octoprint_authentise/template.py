@@ -1,7 +1,9 @@
 # coding=utf-8
+#pylint: disable=no-member
 from __future__ import absolute_import
 
 import octoprint.plugin
+
 
 class TemplatePlugin(octoprint.plugin.TemplatePlugin):
     def get_template_vars(self):
