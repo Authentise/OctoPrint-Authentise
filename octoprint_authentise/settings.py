@@ -15,4 +15,5 @@ class SettingsPlugin(octoprint.plugin.SettingsPlugin):
             printer_id=None,
             streamus_client_path='streamus-client',
             streamus_config_path=None,
+            frame_src='https://app.authentise.com/#/models',
         )

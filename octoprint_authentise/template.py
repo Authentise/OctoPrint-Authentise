@@ -11,6 +11,7 @@ class TemplatePlugin(octoprint.plugin.TemplatePlugin):
             node_uuid=self.node_uuid,
             node_version=self.node_version,
             version=self._plugin_version,
+            frame_src=self._settings.get(["frame_src"]),
         )
 
     def get_template_configs(self):
