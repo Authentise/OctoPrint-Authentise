@@ -1,17 +1,18 @@
 # coding=utf-8
 from __future__ import absolute_import
 
-import Queue
 import logging
+import Queue
 import re
-import requests
 import threading
 import time
 import urlparse
 from urllib import quote_plus
 
 import octoprint.plugin
+import requests
 from octoprint.events import Events, eventManager
+from octoprint.settings import settings
 from octoprint.util import RepeatedTimer, comm_helpers, get_exception_string
 
 from octoprint_authentise import helpers
@@ -19,7 +20,6 @@ from octoprint_authentise import helpers
 __author__ = "Scott Lemmon <scott@authentise.com> based on work by Gina Häußge"
 __license__ = "GNU Affero General Public License http://www.gnu.org/licenses/agpl.html"
 __copyright__ = "Copyright (C) 2015 Authentise - Released under terms of the AGPLv3 License"
-
 
 
 FLOAT_RE = r'[-+]?\d*\.?\d+'
@@ -63,7 +63,7 @@ def parse_temps(line):
     return {'tools': tools, 'bed': bed}
 
 
-class MachineCom(octoprint.plugin.MachineComPlugin):
+class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-instance-attributes, too-many-public-methods
     _logger = None
     _serialLogger = None
 
@@ -73,6 +73,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
     _baudrate = None
     _printer_uri = None
 
+    _authentise_process = None
     _authentise_model = None
 
     _authentise_url = None
@@ -81,12 +82,15 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
 
     _command_uri_queue = None
 
-    _temp = {}
-    _bedTemp = None
     _temperature_timer = None
 
     _callback = None
     _printer_profile_manager = None
+
+    monitoring_thread = None
+    _monitoring_active = False
+
+    _errorValue = None
 
     def __init__(self):
         self._logger = logging.getLogger(__name__)
@@ -96,19 +100,17 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
 
         self._state = self.STATE_NONE
 
-        self._authentise_process = None
-
     def startup(self, callbackObject=None, printerProfileManager=None):
         if callbackObject == None:
-            callbackObject = MachineComPrintCallback()
+            callbackObject = comm_helpers.MachineComPrintCallback()
 
         self._callback = callbackObject
 
         self._printer_profile_manager = printerProfileManager
 
-        self._authentise_url = self._settings.get(['authentise_url'])
-        self._api_key = self._settings.get(['api_key'])
-        self._api_secret = self._settings.get(['api_secret'])
+        self._authentise_url = self._settings.get(['authentise_url']) #pylint: disable=no-member
+        self._api_key = self._settings.get(['api_key']) #pylint: disable=no-member
+        self._api_secret = self._settings.get(['api_secret']) #pylint: disable=no-member
 
     def connect(self, port=None, baudrate=None):
         if port == None:
@@ -133,7 +135,11 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
         self.monitoring_thread.daemon = True
         self.monitoring_thread.start()
 
-        self._temperature_timer = RepeatedTimer(lambda: comm_helpers.get_interval("temperature", default_value=4.0), self._poll_temperature, run_first=True)
+        self._temperature_timer = RepeatedTimer(
+            lambda: comm_helpers.get_interval("temperature", default_value=4.0),
+            self._poll_temperature,
+            run_first=True
+        )
         self._temperature_timer.start()
 
         payload = dict(port=self._port, baudrate=self._baudrate)
@@ -142,7 +148,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
         eventManager().fire(Events.CONNECTED, payload)
 
     def _get_or_create_printer(self, port, baud_rate):
-        client_url = urlparse.urljoin(self._authentise_url, '/client/{}/'.format(self.node_uuid))
+        client_url = urlparse.urljoin(self._authentise_url, '/client/{}/'.format(self.node_uuid)) #pylint: disable=no-member
 
         url = urlparse.urljoin(self._authentise_url,
                                '/printer/instance/?filter[client]={}'.format(quote_plus(client_url)))
@@ -161,7 +167,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
 
             return target_printer['uri']
         else:
-            payload = {'client': self.node_uuid,
+            payload = {'client': self.node_uuid, #pylint: disable=no-member
                        'printer_model': 'https://print.authentise.com/printer/model/9/',
                        'name': '',
                        'port': port,
@@ -191,7 +197,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
     def getState(self):
         return self._state
 
-    def getStateString(self):
+    def getStateString(self): #pylint: disable=too-many-return-statements
         if self._state == self.STATE_NONE:
             return "Offline"
         if self._state == self.STATE_OPEN_SERIAL:
@@ -228,7 +234,10 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
         return self._state == self.STATE_ERROR or self._state == self.STATE_CLOSED_WITH_ERROR
 
     def isOperational(self):
-        return self._state == self.STATE_OPERATIONAL or self._state == self.STATE_PRINTING or self._state == self.STATE_PAUSED or self._state == self.STATE_TRANSFERING_FILE
+        return (self._state == self.STATE_OPERATIONAL
+                or self._state == self.STATE_PRINTING
+                or self._state == self.STATE_PAUSED
+                or self._state == self.STATE_TRANSFERING_FILE)
 
     def isPrinting(self):
         return self._state == self.STATE_PRINTING
@@ -245,25 +254,32 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
     def isSdReady(self):
         return
 
+    def isSdFileSelected(self):
+        return
+
+    def isSdPrinting(self):
+        return
+
+    def getSdFiles(self):
+        return
+
     def getPrintProgress(self):
-        #TODO: Add print progress status updates
-        return self._print_progress
+        return
 
     def getPrintFilepos(self):
         return
 
     def getPrintTime(self):
-        #TODO: Add print time
-            return
+        return
 
     def getCleanedPrintTime(self):
         return
 
     def getTemp(self):
-        return self._temp
+        return
 
     def getBedTemp(self):
-        return self._bedTemp
+        return
 
     def getOffsets(self):
         return {}
@@ -274,14 +290,14 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
     def getConnection(self):
         return self._port, self._baudrate
 
+    def getTransport(self):
+        return
+
     ##~~ external interface
 
     def close(self, isError = False):
-        if self._temperature_timer is not None:
-            try:
-                self._temperature_timer.cancel()
-            except:
-                pass
+        if self._temperature_timer and isinstance(self._temperature_timer, RepeatedTimer):
+            self._temperature_timer.cancel()
 
         self._monitoring_active = False
 
@@ -311,10 +327,20 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
 
             response = requests.post(printer_command_url, json=data, auth=(self._api_key, self._api_secret))
             if not response.ok:
-                self._log('Warning: Got invalid response {}: {} for {}: {}'.format(response.status_code, response.content, response.request.url, response.request.body))
+                self._log(
+                    'Warning: Got invalid response {}: {} for {}: {}'.format(
+                        response.status_code,
+                        response.content,
+                        response.request.url,
+                        response.request.body))
                 return
 
-            self._log('Sent {} to {} with response {}: {}'.format(response.request.body, response.request.url, response.status_code, response.content))
+            self._log(
+                'Sent {} to {} with response {}: {}'.format(
+                    response.request.body,
+                    response.request.url,
+                    response.status_code,
+                    response.content))
             command_uri = response.headers['Location']
             self._command_uri_queue.put({
                 'uri'           : command_uri,
@@ -327,14 +353,13 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
             return
 
         try:
-            #TODO: add logic to make print request here
             payload = {}
-            response = requests.post('http://print.authentise.com/print/', json=payload, auth=(self._api_key, self._api_secret))
+            requests.post('http://print.authentise.com/print/', json=payload, auth=(self._api_key, self._api_secret))
 
             self._changeState(self.STATE_PRINTING)
             eventManager().fire(Events.PRINT_STARTED, None)
 
-        except:
+        except: #pylint: disable=bare-except
             self._logger.exception("Error while trying to start printing")
             self._errorValue = get_exception_string()
             self._changeState(self.STATE_ERROR)
@@ -408,16 +433,17 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
 
         if not pause and self.isPaused():
             self._changeState(self.STATE_PRINTING)
-            #TODO: send resume command
 
             eventManager().fire(Events.PRINT_RESUMED, payload)
         elif pause and self.isPrinting():
             self._changeState(self.STATE_PAUSED)
-            #TODO: send pause command
 
             eventManager().fire(Events.PRINT_PAUSED, payload)
 
-    def getSdFiles(self):
+    def sendGcodeScript(self, scriptName, replacements=None):
+        return
+
+    def startFileTransfer(self, filename, localFilename, remoteFilename):
         return
 
     def startSdFileTransfer(self, filename):
@@ -489,7 +515,6 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
 
         self._log("Connected, starting monitor")
 
-        previous_time = time.time()
         while self._monitoring_active:
             try:
                 line = self._readline()
@@ -504,8 +529,9 @@ class MachineCom(octoprint.plugin.MachineComPlugin):
                     self._callback.on_comm_temperature_update(tool_temps, bed_temp)
                 self._callback.on_comm_message(line)
 
-            except:
-                self._logger.exception("Something crashed inside the serial connection loop, please report this in OctoPrint's bug tracker:")
+            except: #pylint: disable=bare-except
+                self._logger.exception("Something crashed inside the serial connection loop,"
+                        " please report this in OctoPrint's bug tracker:")
                 errorMsg = "See octoprint.log for details"
                 self._log(errorMsg)
                 self._errorValue = errorMsg

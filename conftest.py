@@ -1,10 +1,11 @@
 import logging
-import pytest
+
 import httpretty as HTTPretty
-from octoprint_authentise.comm import MachineCom
-from octoprint_authentise import AuthentisePlugin
-import octoprint.settings
 import octoprint.plugin
+import octoprint.settings
+import pytest
+
+from octoprint_authentise import AuthentisePlugin
 
 LOGGER = logging.getLogger(__name__)
 logging.basicConfig()
@@ -23,16 +24,16 @@ def settings(mocker):
     octoprint.settings.settings(init=True, basedir='.')
     _settings = octoprint.plugin.plugin_settings('authentise', defaults=plugin_settings)
     yield _settings
-    octoprint.settings._instance = None
+    octoprint.settings._instance = None #pylint: disable=protected-access
 
 @pytest.fixture
-def plugin(settings, mocker):
+def plugin(settings): #pylint: disable=redefined-outer-name
     _plugin = AuthentisePlugin()
-    _plugin._settings = settings
+    _plugin._settings = settings #pylint: disable=protected-access
     return _plugin
 
 @pytest.yield_fixture
-def comm(plugin, mocker):
+def comm(plugin, mocker): #pylint: disable=redefined-outer-name
     mocker.patch('octoprint.plugin.plugin_manager', return_value=mocker.Mock())
 
     callback = mocker.Mock()
@@ -52,4 +53,3 @@ def httpretty():
     HTTPretty.disable()
     socket.SocketType = old_socket_type
     HTTPretty.reset()
-

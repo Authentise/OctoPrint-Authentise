@@ -8,7 +8,10 @@ install:
 - pip install --upgrade pip
 - pip install ~/src/octoprint
 - pip install .[develop]
-script: py.test
+script:
+- py.test
+- ./pylint.sh
+- isort -c --diff *.py **/*.py
 notifications:
   slack:
     secure: WNOOHQGrmh508qekqUWEfuFmv+Alic0m5mAqL1xRVqkE7fVguITItKLAU72BwtMilQsBpzKEEV1xalseujQ3C4AfZ2XTenz68WL4/Y69Z0AxXgUcGZo45DshQx4k+lCV/ln7QCVLNdxSW1an9BPi+JqtshbMFVdnIqM1xqKHj51Svsh/4Cq1dZCfJJOtcfIjQToqW/JGZ4E5RC8QqROPfqOehQb0eTHspd/upQgICLFcIFJ877a7ZmK6o3LXW68Dg6y3efymym7wshyxQi2GRLNyPVJgJi3w66uU1HWqVoLn1kFqcQ2kP6v2btyp4GZySmfYP5YPzBTKB1lz6BV8iDM8RDW/D0cxqGG1NjKA0dxkeA8yqb5nmS9+oYxla4l5Azd+73WtRw3Y9Yq/onkMrcVTxp30dFRmDQGC8mabgvXYSqv2PRl89gSsPVqAOFeV0RDQ8TXIuove8NrK3q41lmGyWEuvv8c6bAzucE8dfMpPpk40qAHEKnstkwIqj7f5yBiyYDy5/QLnd/fmaMeC+my5NHE5cYk/E9hBwczoAp51fBp1T+Ju8WYX43hie0GUAnQWlue/Zy79/T96SJiOwjZjFDTGroA46WDOYJEynkcAZxI2eRJqHcTMRXMZ0BmB7nC8+btoqD9X+VLQkzCOuiOTiO8POxyHDj5smXvaze4=

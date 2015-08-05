@@ -3,6 +3,7 @@ from __future__ import absolute_import
 
 import octoprint.plugin
 
+
 class SettingsPlugin(octoprint.plugin.SettingsPlugin):
     def get_settings_defaults(self):
         return dict(
