@@ -8,7 +8,7 @@ from uuid import uuid4
 import requests
 
 
-def run_client_and_wait(settings, logger, args=""):
+def run_client_and_wait(settings, logger, args=None):
     try:
         process = run_client(settings, args)
         output, _ = process.communicate()
@@ -17,18 +17,18 @@ def run_client_and_wait(settings, logger, args=""):
         logger.error("Error running client command `%s` using parameters: %s", exception, args)
         return
 
-def run_client(settings, args=""):
+def run_client(settings, args=None):
     command = [settings.get(["streamus_client_path"]),
                '--logging-level', 'debug',
                ]
 
     if settings.get(["streamus_config_path"]):
-        command.append(['-c', settings.get(["streamus_config_path"])])
+        command.extend(['-c', settings.get(["streamus_config_path"])])
 
     if args:
-        command.append(args)
+        command.extend(args)
 
-    return subprocess.Popen(command, stdout=subprocess.PIPE)
+    return subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 def claim_node(settings, node_uuid, api_key, api_secret, logger):
     if not node_uuid:
@@ -43,7 +43,7 @@ def claim_node(settings, node_uuid, api_key, api_secret, logger):
         logger.error("No API secret available to claim node")
         return False
 
-    claim_code = run_client_and_wait(settings, args='--connection-code', logger=logger)
+    claim_code = run_client_and_wait(settings, args=['--connection-code'], logger=logger)
     if claim_code:
         logger.info("Got claim code: %s", claim_code)
     else:
