@@ -41,7 +41,7 @@ def test_printer_connect_get_authentise_printer(comm, httpretty, mocker, setting
     comm.node_uuid = "youre-a-wizard-harry"
     url = urljoin(settings.get(["authentise_url"]), "/printer/instance/")
     printer_uri = urljoin(url, "abc-123/")
-    printers_payload = {"resources": [{"baud": 250000,
+    printers_payload = {"resources": [{"baud_rate": 250000,
                                        "port": "/dev/tty.derp",
                                        "uri": printer_uri}]}
 
@@ -75,7 +75,7 @@ def test_printer_connect_get_authentise_printer_no_put(comm, httpretty, mocker, 
     comm.node_uuid = "youre-a-wizard-harry"
     url = urljoin(settings.get(["authentise_url"]), "/printer/instance/")
     printer_uri = urljoin(url, "abc-123/")
-    printers_payload = {"resources": [{"baud": 250000,
+    printers_payload = {"resources": [{"baud_rate": 250000,
                                        "port": "/dev/tty.derp",
                                        "uri": printer_uri}]}
 
