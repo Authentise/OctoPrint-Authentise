@@ -171,7 +171,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
 
             payload = {'client': client_url,
                        'printer_model': 'https://print.dev-auth.com/printer/model/9/',
-                       'name': '',
+                       'name': 'Octoprint Printer',
                        'port': port,
                        'baud_rate': baud_rate}
             create_printer_resp = requests.post(urlparse.urljoin(self._authentise_url,
