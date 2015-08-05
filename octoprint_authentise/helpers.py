@@ -10,14 +10,14 @@ import requests
 
 def run_client_and_wait(settings, logger, args=None):
     try:
-        process = run_client(settings, args)
+        process = run_client(settings, args, pipe=subprocess.PIPE)
         output, _ = process.communicate()
         return output.strip()
     except subprocess.CalledProcessError as exception:
         logger.error("Error running client command `%s` using parameters: %s", exception, args)
         return
 
-def run_client(settings, args=None):
+def run_client(settings, args=None, pipe=None):
     command = [settings.get(["streamus_client_path"]),
                '--logging-level', 'debug',
                ]
@@ -28,7 +28,7 @@ def run_client(settings, args=None):
     if args:
         command.extend(args)
 
-    return subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return subprocess.Popen(command, stdout=pipe, stderr=pipe)
 
 def claim_node(settings, node_uuid, api_key, api_secret, logger):
     if not node_uuid:
