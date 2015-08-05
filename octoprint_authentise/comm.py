@@ -308,6 +308,11 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
 
         if printing:
             eventManager().fire(Events.PRINT_FAILED, None)
+
+        # close the Authentise client if it is open
+        if self._authentise_process:
+            self._authentise_process.send_signal(2) #send the SIGINT signal
+
         self._changeState(self.STATE_CLOSED)
         eventManager().fire(Events.DISCONNECTED)
 
