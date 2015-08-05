@@ -127,6 +127,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         self._printer_uri = self._get_or_create_printer(port, baudrate)
 
         self._authentise_process = helpers.run_client()
+        self._log(self._authentise_process.pid)
 
 
         # monitoring thread
@@ -156,25 +157,28 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
 
         printer_get_resp = requests.get(url=url, auth=(self._api_key, self._api_secret))
 
+        self._log(str(printer_get_resp.json()))
         for printer in printer_get_resp.json()["resources"]:
             if printer['port'] == port:
                 target_printer = printer
                 break
 
         if target_printer:
-            if target_printer['baud'] != baud_rate:
+            if target_printer['baud_rate'] != baud_rate:
                 requests.put(target_printer["uri"], json={'baud_rate': baud_rate})
 
             return target_printer['uri']
         else:
-            payload = {'client': self.node_uuid, #pylint: disable=no-member
-                       'printer_model': 'https://print.authentise.com/printer/model/9/',
+
+            payload = {'client': client_url,
+                       'printer_model': 'https://print.dev-auth.com/printer/model/9/',
                        'name': '',
                        'port': port,
                        'baud_rate': baud_rate}
             create_printer_resp = requests.post(urlparse.urljoin(self._authentise_url,
                                                                  '/printer/instance/'),
-                                                json=payload)
+                                                json=payload,
+                                                auth=(self._api_key, self._api_secret))
             return create_printer_resp.headers["Location"]
 
     # #~~ internal state management

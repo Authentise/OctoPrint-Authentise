@@ -26,12 +26,12 @@ def run_client_and_wait(logger, args=""):
         return
 
 def run_client(args=""):
-    command = (
-        STREAMUS_CLIENT_PATH,
-        '--logging-level', 'error',
-        '-c', '/Applications/Authentise.app/Contents/Resources/client.conf',
-        args,
-    )
+    command = [STREAMUS_CLIENT_PATH,
+               '--logging-level', 'debug',
+               '-c', STREAMUS_CONFIG_PATH]
+
+    if args:
+        command.append(args)
 
     return subprocess.Popen(command, stdout=subprocess.PIPE)
 
