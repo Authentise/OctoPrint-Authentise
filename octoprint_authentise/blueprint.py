@@ -16,16 +16,16 @@ class BlueprintPlugin(octoprint.plugin.BlueprintPlugin):
         username = flask.request.json.get('username')
         password = flask.request.json.get('password')
 
-        status_code, response_json, cookies = helpers.login(username, password, self._logger)
+        status_code, response_json, cookies = helpers.login(self._settings, username, password, self._logger)
         if not cookies:
             return json.dumps(response_json), status_code
 
-        status_code, response_json = helpers.create_api_token(cookies, self._logger)
+        status_code, response_json = helpers.create_api_token(self._settings, cookies, self._logger)
         if status_code == 201:
             api_key = response_json.get('uuid')
             api_secret = response_json.get('secret')
 
-            if helpers.claim_node(self.node_uuid, api_key, api_secret, self._logger):
+            if helpers.claim_node(self._settings, self.node_uuid, api_key, api_secret, self._logger):
                 self.on_settings_save({
                     "api_key": api_key,
                     "api_secret": api_secret,
@@ -36,7 +36,7 @@ class BlueprintPlugin(octoprint.plugin.BlueprintPlugin):
 
     @octoprint.plugin.BlueprintPlugin.route("/node/", methods=["GET"])
     def get_node(self):
-        connection_code = helpers.run_client_and_wait(args='--connection-code', logger=self._logger)
+        connection_code = helpers.run_client_and_wait(self._settings, args='--connection-code', logger=self._logger)
         if connection_code:
             self._logger.info("Found node connection code: %s", connection_code)
             results = {

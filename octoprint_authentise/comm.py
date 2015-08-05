@@ -126,9 +126,8 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         self._baudrate = baudrate
         self._printer_uri = self._get_or_create_printer(port, baudrate)
 
-        self._authentise_process = helpers.run_client()
+        self._authentise_process = helpers.run_client(self._settings) #pylint: disable=no-member
         self._log(self._authentise_process.pid)
-
 
         # monitoring thread
         self._monitoring_active = True

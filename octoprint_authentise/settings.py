@@ -13,6 +13,6 @@ class SettingsPlugin(octoprint.plugin.SettingsPlugin):
             authentise_url='https://print.dev-auth.com',
             authentise_user_url='https://users.dev-auth.com',
             printer_id=None,
-            streamus_client_path='/Users/joe/Documents/workspace/archer/bin/streamus-client',
-            streamus_config_path='/Applications/Authentise.app/Contents/Resources/client.conf',
+            streamus_client_path='streamus-client',
+            streamus_config_path=None,
         )
