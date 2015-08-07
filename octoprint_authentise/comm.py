@@ -25,7 +25,7 @@ __copyright__ = "Copyright (C) 2015 Authentise - Released under terms of the AGP
 FLOAT_RE = r'[-+]?\d*\.?\d+'
 JUNK_RE = r'(?:\s+.*?\s*)?'
 TEMP_RE = re.compile(
-        r'^.*\s*T:\s*(?P<T>{float})(?:\s*/(?P<TT>{float}))?'
+        r'^(?:ok)?\s*T:\s*(?P<T>{float})(?:\s*/(?P<TT>{float}))?'
         r'(?:{junk}\s*B:\s*(?P<B>{float})(?:\s*/(?P<TB>{float}))?)?'
         r'(?:{junk}\s*T0:\s*(?P<T0>{float})(?:\s*/(?P<TT0>{float}))?)?'
         r'(?:{junk}\s*T1:\s*(?P<T1>{float})(?:\s*/(?P<TT1>{float}))?)?'
@@ -127,7 +127,6 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         self._printer_uri = self._get_or_create_printer(port, baudrate)
 
         self._authentise_process = helpers.run_client(self._settings) #pylint: disable=no-member
-        self._log(self._authentise_process.pid)
 
         # monitoring thread
         self._monitoring_active = True
@@ -153,13 +152,14 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         url = urlparse.urljoin(self._authentise_url,
                                '/printer/instance/?filter[client]={}'.format(quote_plus(client_url)))
         target_printer = None
+        self._log('Getting printer list from: {}'.format(url))
 
         printer_get_resp = requests.get(url=url, auth=(self._api_key, self._api_secret))
 
-        self._log(str(printer_get_resp.json()))
         for printer in printer_get_resp.json()["resources"]:
             if printer['port'] == port:
                 target_printer = printer
+                self._log('Printer {} matches selected port {}'.format(printer, port))
                 break
 
         if target_printer:
@@ -168,6 +168,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
 
             return target_printer['uri']
         else:
+            self._log('No printer found for port {}. Creating it.'.format(port))
 
             payload = {'client': client_url,
                        'printer_model': 'https://print.dev-auth.com/printer/model/9/',
@@ -485,8 +486,6 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
             command = self._command_uri_queue.get_nowait()
         except Queue.Empty:
             return ''
-
-        # self._log('Popped: {} from queue'.format(command))
 
         start_time    = command['start_time']
         previous_time = command['previous_time']

@@ -2,6 +2,7 @@
 from __future__ import absolute_import
 
 import json
+import os
 import subprocess
 from uuid import uuid4
 
@@ -17,10 +18,17 @@ def run_client_and_wait(settings, logger, args=None):
         logger.error("Error running client command `%s` using parameters: %s", exception, args)
         return
 
+DEVNULL = open(os.devnull, 'w')
 def run_client(settings, args=None, pipe=None):
-    command = [settings.get(["streamus_client_path"]),
-               '--logging-level', 'debug',
-               ]
+    command = []
+    if isinstance(settings.get(["streamus_client_path"]), list):
+        command.extend(settings.get(["streamus_client_path"]))
+    else:
+        command.append(settings.get(["streamus_client_path"]))
+
+    command.extend([
+                   '--logging-level', 'debug',
+                   ])
 
     if settings.get(["streamus_config_path"]):
         command.extend(['-c', settings.get(["streamus_config_path"])])
@@ -28,6 +36,8 @@ def run_client(settings, args=None, pipe=None):
     if args:
         command.extend(args)
 
+    if pipe==None:
+        pipe=DEVNULL
     return subprocess.Popen(command, stdout=pipe, stderr=pipe)
 
 def claim_node(settings, node_uuid, api_key, api_secret, logger):
