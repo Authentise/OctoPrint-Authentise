@@ -343,6 +343,7 @@ def test_readline(comm, httpretty, mocker, command_queue, response, current_time
     ('ok', None),
     ('something that isnt gcode', None),
     ('ok, T:7.Nooope', None),
+    ('ok T:219.0 /220.0 T0:219.0 /220.0 @:72 B@:0', {'tools': [{'actual':219.0, 'target':220}], 'bed':None}),
 ])
 def test_parse_temps(line, expected):
     actual = _comm.parse_temps(line)
