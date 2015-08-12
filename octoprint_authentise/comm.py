@@ -300,7 +300,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
     ##~~ external interface
 
     def close(self, isError = False):
-        if self._temperature_timer and isinstance(self._temperature_timer, RepeatedTimer):
+        if self._temperature_timer:
             self._temperature_timer.cancel()
 
         self._monitoring_active = False
@@ -517,6 +517,9 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         command_response = response.json()
         self._log('Got response: {}, for command: {}'.format(command_response['response'], command_response['command']))
         return command_response['response']
+
+    def _get_printer_status(self):
+        pass
 
     def _monitor_loop(self):
 

@@ -17,8 +17,10 @@ def test_printer_connect_create_authentise_printer(comm, printer, httpretty, moc
     httpretty.register_uri(httpretty.POST, printer['request_url'],
                            adding_headers={"Location": printer['uri']})
 
-    # keep authentise from actually starting
-    mocker.patch("octoprint_authentise.helpers.run_client")
+    # keep authentise and monitoring threads from actually starting
+    mocker.patch('octoprint_authentise.comm.threading.Thread')
+    mocker.patch('octoprint_authentise.comm.RepeatedTimer')
+    mocker.patch("octoprint_authentise.comm.helpers.run_client")
 
     comm.connect(port="1234", baudrate=5678)
 
@@ -39,8 +41,10 @@ def test_printer_connect_get_authentise_printer(comm, printer, httpretty, mocker
     httpretty.register_uri(httpretty.PUT, printer['uri'])
 
 
-    # keep authentise from actually starting
-    mocker.patch("octoprint_authentise.helpers.run_client")
+    # keep authentise and monitoring threads from actually starting
+    mocker.patch('octoprint_authentise.comm.threading.Thread')
+    mocker.patch('octoprint_authentise.comm.RepeatedTimer')
+    mocker.patch("octoprint_authentise.comm.helpers.run_client")
 
     comm.connect(port="/dev/tty.derp", baudrate=5678)
 
@@ -55,8 +59,10 @@ def test_printer_connect_get_authentise_printer(comm, printer, httpretty, mocker
 
 # tests case in which port and baud rate are just right
 def test_printer_connect_get_authentise_printer_no_put(comm, printer, mocker):
-    # keep authentise from actually starting
-    mocker.patch("octoprint_authentise.helpers.run_client")
+    # keep authentise and monitoring threads from actually starting
+    mocker.patch('octoprint_authentise.comm.threading.Thread')
+    mocker.patch('octoprint_authentise.comm.RepeatedTimer')
+    mocker.patch("octoprint_authentise.comm.helpers.run_client")
 
     comm.connect(port="/dev/tty.derp", baudrate=250000)
 
@@ -319,3 +325,6 @@ def test_readline(comm, httpretty, mocker, command_queue, response, current_time
 def test_parse_temps(line, expected):
     actual = _comm.parse_temps(line)
     assert actual == expected
+
+def test_get_printer_status(comm, connect_printer): #pylint: disable=unused-argument
+    comm._get_printer_status()
