@@ -1,4 +1,7 @@
+import json
 import logging
+import uuid
+from urlparse import urljoin
 
 import httpretty as HTTPretty
 import octoprint.plugin
@@ -43,6 +46,28 @@ def comm(plugin, mocker): #pylint: disable=redefined-outer-name
 
     yield plugin
     plugin.close()
+
+@pytest.fixture
+def printer(comm, node_uuid, settings, httpretty): #pylint: disable=redefined-outer-name
+    comm.node_uuid = node_uuid
+
+    url = urljoin(settings.get(["authentise_url"]), "/printer/instance/")
+    printer_uri = urljoin(url, "abc-123/")
+
+    printers_payload = {"resources": [{"baud_rate": 250000,
+                                       "port": "/dev/tty.derp",
+                                       "uri": printer_uri}]}
+    httpretty.register_uri(httpretty.GET,
+                           url,
+                           body=json.dumps(printers_payload),
+                           content_type='application/json')
+
+    return {'uri': printer_uri, 'request_url': url}
+
+
+@pytest.fixture
+def node_uuid():
+    return uuid.uuid4()
 
 @pytest.yield_fixture
 def httpretty():

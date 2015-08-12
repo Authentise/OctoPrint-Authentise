@@ -1,7 +1,6 @@
 #pylint: disable=line-too-long, protected-access
 import json
 import Queue
-from urlparse import urljoin
 
 import pytest
 
@@ -9,18 +8,14 @@ from octoprint_authentise import comm as _comm
 
 
 # tests case in which the user has no authentise printers
-def test_printer_connect_create_authentise_printer(comm, httpretty, mocker, settings):
-    comm.node_uuid = "youre-a-wizard-harry"
-
-    url = urljoin(settings.get(["authentise_url"]), "/printer/instance/")
-
+def test_printer_connect_create_authentise_printer(comm, printer, httpretty, mocker):
     httpretty.register_uri(httpretty.GET,
-                           url,
+                           printer['request_url'],
                            body=json.dumps({"resources": []}),
                            content_type='application/json')
 
-    httpretty.register_uri(httpretty.POST, url,
-                           adding_headers={"Location": urljoin(url, "abc-123/")})
+    httpretty.register_uri(httpretty.POST, printer['request_url'],
+                           adding_headers={"Location": printer['uri']})
 
     # keep authentise from actually starting
     mocker.patch("octoprint_authentise.helpers.run_client")
@@ -33,27 +28,15 @@ def test_printer_connect_create_authentise_printer(comm, httpretty, mocker, sett
     assert not comm.isPaused()
     assert not comm.isError()
     assert not comm.isClosedOrError()
-    assert comm._printer_uri == urljoin(url, "abc-123/")
+    assert comm._printer_uri == printer['uri']
 
 
 # tests case in which the user has a printer on the right port, but the baud rate is wrong
-def test_printer_connect_get_authentise_printer(comm, httpretty, mocker, settings):
-    comm.node_uuid = "youre-a-wizard-harry"
-    url = urljoin(settings.get(["authentise_url"]), "/printer/instance/")
-    printer_uri = urljoin(url, "abc-123/")
-    printers_payload = {"resources": [{"baud_rate": 250000,
-                                       "port": "/dev/tty.derp",
-                                       "uri": printer_uri}]}
+def test_printer_connect_get_authentise_printer(comm, printer, httpretty, mocker,):
+    httpretty.register_uri(httpretty.POST, printer['request_url'],
+                           adding_headers={"Location": printer['uri']})
 
-    httpretty.register_uri(httpretty.GET,
-                           url,
-                           body=json.dumps(printers_payload),
-                           content_type='application/json')
-
-    httpretty.register_uri(httpretty.POST, url,
-                           adding_headers={"Location": urljoin(url, "abc-123/")})
-
-    httpretty.register_uri(httpretty.PUT, printer_uri)
+    httpretty.register_uri(httpretty.PUT, printer['uri'])
 
 
     # keep authentise from actually starting
@@ -67,23 +50,11 @@ def test_printer_connect_get_authentise_printer(comm, httpretty, mocker, setting
     assert not comm.isPaused()
     assert not comm.isError()
     assert not comm.isClosedOrError()
-    assert comm._printer_uri == urljoin(url, "abc-123/")
+    assert comm._printer_uri == printer['uri']
 
 
 # tests case in which port and baud rate are just right
-def test_printer_connect_get_authentise_printer_no_put(comm, httpretty, mocker, settings):
-    comm.node_uuid = "youre-a-wizard-harry"
-    url = urljoin(settings.get(["authentise_url"]), "/printer/instance/")
-    printer_uri = urljoin(url, "abc-123/")
-    printers_payload = {"resources": [{"baud_rate": 250000,
-                                       "port": "/dev/tty.derp",
-                                       "uri": printer_uri}]}
-
-    httpretty.register_uri(httpretty.GET,
-                           url,
-                           body=json.dumps(printers_payload),
-                           content_type='application/json')
-
+def test_printer_connect_get_authentise_printer_no_put(comm, printer, mocker):
     # keep authentise from actually starting
     mocker.patch("octoprint_authentise.helpers.run_client")
 
@@ -95,7 +66,7 @@ def test_printer_connect_get_authentise_printer_no_put(comm, httpretty, mocker, 
     assert not comm.isPaused()
     assert not comm.isError()
     assert not comm.isClosedOrError()
-    assert comm._printer_uri == urljoin(url, "abc-123/")
+    assert comm._printer_uri == printer['uri']
 
 @pytest.mark.parametrize("command_queue, response, current_time, expected_return, expected_queue", [
     (
