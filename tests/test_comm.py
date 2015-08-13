@@ -24,12 +24,7 @@ def test_printer_connect_create_authentise_printer(comm, printer, httpretty, moc
 
     comm.connect(port="1234", baudrate=5678)
 
-    assert comm.isOperational()
-    assert not comm.isBusy()
-    assert not comm.isPrinting()
-    assert not comm.isPaused()
-    assert not comm.isError()
-    assert not comm.isClosedOrError()
+    assert comm.getState() == _comm.PRINTER_STATE['CONNECTING']
     assert comm._printer_uri == printer['uri']
 
 
@@ -48,12 +43,7 @@ def test_printer_connect_get_authentise_printer(comm, printer, httpretty, mocker
 
     comm.connect(port="/dev/tty.derp", baudrate=5678)
 
-    assert comm.isOperational()
-    assert not comm.isBusy()
-    assert not comm.isPrinting()
-    assert not comm.isPaused()
-    assert not comm.isError()
-    assert not comm.isClosedOrError()
+    assert comm.getState() == _comm.PRINTER_STATE['CONNECTING']
     assert comm._printer_uri == printer['uri']
 
 
@@ -66,12 +56,7 @@ def test_printer_connect_get_authentise_printer_no_put(comm, printer, mocker):
 
     comm.connect(port="/dev/tty.derp", baudrate=250000)
 
-    assert comm.isOperational()
-    assert not comm.isBusy()
-    assert not comm.isPrinting()
-    assert not comm.isPaused()
-    assert not comm.isError()
-    assert not comm.isClosedOrError()
+    assert comm.getState() == _comm.PRINTER_STATE['CONNECTING']
     assert comm._printer_uri == printer['uri']
 
 @pytest.mark.parametrize("command_queue, response, current_time, expected_return, expected_queue", [
@@ -319,7 +304,7 @@ def test_readline(comm, httpretty, mocker, command_queue, response, current_time
     ('ok T:70 /190 B:30 /100 T0:70 /190 T1:90 /210', {'tools': [{'actual':70, 'target':190}, {'actual':90, 'target':210}], 'bed':{'actual':30, 'target':100}}),
     ('ok', None),
     ('something that isnt gcode', None),
-    ('ok, T:7.Nooope', None),
+    ('ok T:7.Nooope', None),
     ('ok T:219.0 /220.0 T0:219.0 /220.0 @:72 B@:0', {'tools': [{'actual':219.0, 'target':220}], 'bed':None}),
 ])
 def test_parse_temps(line, expected):
@@ -327,4 +312,4 @@ def test_parse_temps(line, expected):
     assert actual == expected
 
 def test_get_printer_status(comm, connect_printer): #pylint: disable=unused-argument
-    comm._get_printer_status()
+    comm._update_printer_data()
