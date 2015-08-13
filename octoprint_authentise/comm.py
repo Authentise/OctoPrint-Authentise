@@ -220,7 +220,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
                 eventManager().fire(Events.PRINT_STARTED, None)
 
             # It is not easy to tell the difference between an completed print and a cancled print at this point
-            elif new_state == PRINTER_STATE['CONNECTED'] and old_state != PRINTER_STATE['CONNECTING']:
+            elif new_state == PRINTER_STATE['OPERATIONAL'] and old_state != PRINTER_STATE['CONNECTING']:
                 eventManager().fire(Events.PRINT_DONE, None)
 
         elif new_state == PRINTER_STATE['CLOSED']:

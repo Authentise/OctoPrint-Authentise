@@ -312,4 +312,11 @@ def test_parse_temps(line, expected):
     assert actual == expected
 
 def test_get_printer_status(comm, connect_printer): #pylint: disable=unused-argument
-    comm._update_printer_data()
+    # comm._update_printer_data()
+    pass
+
+def test_change_state():
+    pass
+
+def test_send_command():
+    pass
