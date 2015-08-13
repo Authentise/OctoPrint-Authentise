@@ -10,7 +10,6 @@ import urlparse
 from urllib import quote_plus
 
 import octoprint.plugin
-import requests
 from octoprint.events import Events, eventManager
 from octoprint.settings import settings
 from octoprint.util import RepeatedTimer, comm_helpers, get_exception_string
@@ -77,8 +76,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
     _authentise_model = None
 
     _authentise_url = None
-    _api_key = None
-    _api_secret = None
+    _session = None
 
     _command_uri_queue = None
 
@@ -109,8 +107,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         self._printer_profile_manager = printerProfileManager
 
         self._authentise_url = self._settings.get(['authentise_url']) #pylint: disable=no-member
-        self._api_key = self._settings.get(['api_key']) #pylint: disable=no-member
-        self._api_secret = self._settings.get(['api_secret']) #pylint: disable=no-member
+        self._session = helpers.session(self._settings) #pylint: disable=no-member
 
     def connect(self, port=None, baudrate=None):
         if port == None:
@@ -154,7 +151,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         target_printer = None
         self._log('Getting printer list from: {}'.format(url))
 
-        printer_get_resp = requests.get(url=url, auth=(self._api_key, self._api_secret))
+        printer_get_resp = self._session.get(url=url)
 
         for printer in printer_get_resp.json()["resources"]:
             if printer['port'] == port:
@@ -164,7 +161,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
 
         if target_printer:
             if target_printer['baud_rate'] != baud_rate:
-                requests.put(target_printer["uri"], json={'baud_rate': baud_rate})
+                self._session.put(target_printer["uri"], json={'baud_rate': baud_rate})
 
             return target_printer['uri']
         else:
@@ -175,10 +172,9 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
                        'name': 'Octoprint Printer',
                        'port': port,
                        'baud_rate': baud_rate}
-            create_printer_resp = requests.post(urlparse.urljoin(self._authentise_url,
+            create_printer_resp = self._session.post(urlparse.urljoin(self._authentise_url,
                                                                  '/printer/instance/'),
-                                                json=payload,
-                                                auth=(self._api_key, self._api_secret))
+                                                json=payload)
             return create_printer_resp.headers["Location"]
 
     # #~~ internal state management
@@ -334,7 +330,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
             data = {'command': cmd}
             printer_command_url = urlparse.urljoin(self._printer_uri, 'command/')
 
-            response = requests.post(printer_command_url, json=data, auth=(self._api_key, self._api_secret))
+            response = self._session.post(printer_command_url, json=data)
             if not response.ok:
                 self._log(
                     'Warning: Got invalid response {}: {} for {}: {}'.format(
@@ -363,7 +359,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
 
         try:
             payload = {}
-            requests.post('http://print.authentise.com/print/', json=payload, auth=(self._api_key, self._api_secret))
+            self._session.post('http://print.authentise.com/print/', json=payload)
 
             self._changeState(self.STATE_PRINTING)
             eventManager().fire(Events.PRINT_STARTED, None)
@@ -502,7 +498,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
             }, start_time_diff)
             return ''
 
-        response = requests.get(command_uri, auth=(self._api_key, self._api_secret))
+        response = self._session.get(command_uri)
 
         if response.ok and response.json()['status'] in ['error', 'printer_offline']:
             return ''

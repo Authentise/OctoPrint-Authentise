@@ -105,3 +105,8 @@ def create_api_token(settings, cookies, logger):
         logger.error("Error creating api token for user")
 
     return response.status_code, json.loads(response.text)
+
+def session(settings):
+    _session = requests.Session()
+    _session.auth = requests.auth.HTTPBasicAuth(settings.get(['api_key']), settings.get(['api_secret']))
+    return _session
