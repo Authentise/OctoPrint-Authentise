@@ -21,14 +21,14 @@ __license__ = "GNU Affero General Public License http://www.gnu.org/licenses/agp
 __copyright__ = "Copyright (C) 2015 Authentise - Released under terms of the AGPLv3 License"
 
 PRINTER_STATE = {
-    'OFFLINE'           : 0,
-    'CONNECTING'        : 4,
-    'OPERATIONAL'       : 5,
-    'PRINTING'          : 6,
-    'PAUSED'            : 7,
-    'CLOSED'            : 8,
-    'ERROR'             : 9,
-    'CLOSED_WITH_ERROR' : 10,
+    'OFFLINE'           : octoprint.plugin.MachineComPlugin.STATE_NONE,
+    'CONNECTING'        : octoprint.plugin.MachineComPlugin.STATE_CONNECTING,
+    'OPERATIONAL'       : octoprint.plugin.MachineComPlugin.STATE_OPERATIONAL,
+    'PRINTING'          : octoprint.plugin.MachineComPlugin.STATE_PRINTING,
+    'PAUSED'            : octoprint.plugin.MachineComPlugin.STATE_PAUSED,
+    'CLOSED'            : octoprint.plugin.MachineComPlugin.STATE_CLOSED,
+    'ERROR'             : octoprint.plugin.MachineComPlugin.STATE_ERROR,
+    'CLOSED_WITH_ERROR' : octoprint.plugin.MachineComPlugin.STATE_CLOSED_WITH_ERROR,
     }
 PRINTER_STATE_REVERSE = dict((v,k) for k,v in PRINTER_STATE.items())
 
@@ -257,7 +257,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         return self._state in [ PRINTER_STATE['OPERATIONAL'], PRINTER_STATE['PRINTING'], PRINTER_STATE['PAUSED']]
 
     def isPrinting(self):
-        return self._state == PRINTER_STATE['PRINTING'],
+        return self._state == PRINTER_STATE['PRINTING']
 
     def isStreaming(self):
         return
@@ -489,7 +489,6 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
                 self._log(errorMsg)
                 self._errorValue = errorMsg
                 self._change_state(PRINTER_STATE['ERROR'])
-                eventManager().fire(Events.ERROR, {"error": self.getErrorString()})
             time.sleep(0.1)
         self._log("Connection closed, closing down monitor")
 
