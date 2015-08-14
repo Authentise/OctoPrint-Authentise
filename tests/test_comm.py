@@ -1,6 +1,7 @@
 #pylint: disable=line-too-long, protected-access
 import json
 import Queue
+from urlparse import urljoin
 
 import pytest
 from octoprint.events import Events
@@ -277,8 +278,8 @@ def test_printer_connect_get_authentise_printer_no_put(comm, printer, mocker):
         },
     ),
 ]) #pylint: disable=too-many-arguments
-def test_readline(comm, httpretty, mocker, command_queue, response, current_time, expected_return, expected_queue):
-    mocker.patch('time.time', return_value=current_time)
+def test_readline(comm, httpretty, set_time, command_queue, response, current_time, expected_return, expected_queue):
+    set_time(current_time)
 
     if command_queue:
         httpretty.register_uri(httpretty.GET, command_queue['uri'],
@@ -323,18 +324,15 @@ def test_parse_temps(line, expected):
     (_comm.PRINTER_STATE['OPERATIONAL'], _comm.PRINTER_STATE['ERROR'], (Events.ERROR, {'error': None})),
     (_comm.PRINTER_STATE['OPERATIONAL'], _comm.PRINTER_STATE['CLOSED_WITH_ERROR'], (Events.ERROR, {'error': None})),
 ])
-def test_change_state(old_state, new_state, event, comm, connect_printer, mocker): #pylint: disable=unused-argument
-    event_fire_mock = mocker.Mock()
-    mocker.patch('octoprint_authentise.comm.eventManager', return_value=mocker.Mock(fire=event_fire_mock))
-
+def test_change_state(old_state, new_state, event, comm, connect_printer, event_manager): #pylint: disable=unused-argument
     comm._state = old_state
     comm._change_state(new_state)
 
     assert comm._state == new_state
     if event:
-        event_fire_mock.assert_called_once_with(*event)
+        event_manager.fire.assert_called_once_with(*event)
     else:
-        assert event_fire_mock.call_count == 0
+        assert event_manager.fire.call_count == 0
 
 ### TESTS FOR VARIOUS GETTERS ###
 def test_getState(comm):
@@ -495,3 +493,76 @@ def test_getConnection(comm, connect_printer): #pylint: disable=unused-argument
 
 def test_getTransport(comm):
     assert not comm.getTransport()
+
+### TESTS FOR OTHER EXTERNAL METHODS ###
+
+def test_close_not_printing(comm, connect_printer, event_manager): #pylint: disable=unused-argument
+    comm._state = _comm.PRINTER_STATE['OPERATIONAL']
+    comm.close()
+
+    comm._printer_status_timer.cancel.assert_called_once_with()
+    comm._authentise_process.send_signal.assert_called_once_with(2)
+    assert comm._state == _comm.PRINTER_STATE['CLOSED']
+    event_manager.fire.assert_called_once_with(Events.DISCONNECTED)
+
+def test_close_while_printing(comm, connect_printer, event_manager): #pylint: disable=unused-argument
+    comm._state = _comm.PRINTER_STATE['PRINTING']
+    comm.close()
+
+    comm._printer_status_timer.cancel.assert_called_once_with()
+    comm._authentise_process.send_signal.assert_called_once_with(2)
+    assert comm._state == _comm.PRINTER_STATE['CLOSED']
+    event_manager.fire.assert_any_call(Events.PRINT_FAILED, None)
+    event_manager.fire.assert_called_with(Events.DISCONNECTED)
+
+
+@pytest.mark.parametrize("command, sent_command", [
+    ('G1 X50 Y50', 'G1 X50 Y50'),
+    (u'G28; HOME!!!!', 'G28'),
+])
+def test_send_command_printer_operational(command, sent_command, comm, connect_printer, httpretty, set_time): #pylint: disable=unused-argument
+    now = 12345
+    set_time(now)
+
+    comm._state = _comm.PRINTER_STATE['OPERATIONAL']
+
+    command_uri = urljoin(comm._printer_uri, 'command/1234-asdf/')
+
+    httpretty.register_uri(httpretty.POST,
+                           urljoin(comm._printer_uri, 'command/'),
+                           adding_headers={'Location': command_uri})
+
+    comm.sendCommand(command)
+    expected = {'uri': command_uri,
+            'start_time' : now,
+            'previous_time' : None}
+    assert comm._command_uri_queue.get_nowait() == expected
+    assert httpretty.last_request().body == json.dumps({'command': sent_command})
+
+def test_send_command_printer_not_operational(comm, connect_printer, httpretty): #pylint: disable=unused-argument
+    httpretty.reset()
+    comm._state = _comm.PRINTER_STATE['OFFLINE']
+
+    comm.sendCommand('G1 X50 Y50')
+    with pytest.raises(Queue.Empty):
+        comm._command_uri_queue.get_nowait()
+    assert not httpretty.has_request()
+
+def test_send_command_bad_response(comm, connect_printer, httpretty): #pylint: disable=unused-argument
+    comm._state = _comm.PRINTER_STATE['OPERATIONAL']
+
+    command_uri = urljoin(comm._printer_uri, 'command/1234-asdf/')
+
+    httpretty.register_uri(httpretty.POST,
+                           urljoin(comm._printer_uri, 'command/'),
+                           status=400,
+                           adding_headers={'Location': command_uri})
+
+    comm.sendCommand('G1 X50 Y50')
+    with pytest.raises(Queue.Empty):
+        comm._command_uri_queue.get_nowait()
+    assert httpretty.last_request().body == json.dumps({'command': 'G1 X50 Y50'})
+
+def test_get_printer_status(comm, connect_printer): #pylint: disable=unused-argument
+    # comm._update_printer_data()
+    pass

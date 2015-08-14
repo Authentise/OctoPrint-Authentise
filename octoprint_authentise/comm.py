@@ -330,10 +330,10 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         self._change_state(PRINTER_STATE['CLOSED'])
 
     def setTemperatureOffset(self, offsets):
-        return
+        pass
 
     def fakeOk(self):
-        return
+        pass
 
     def sendCommand(self, cmd, cmd_type=None, processed=False):
         cmd = cmd.encode('ascii', 'replace')
@@ -342,7 +342,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
             if not cmd:
                 return
 
-        if self.isPrinting() or self.isOperational():
+        if self.isOperational():
             data = {'command': cmd}
             printer_command_url = urlparse.urljoin(self._printer_uri, 'command/')
 

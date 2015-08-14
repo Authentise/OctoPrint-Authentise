@@ -71,7 +71,7 @@ def printer(comm, node_uuid, settings, httpretty): #pylint: disable=redefined-ou
     return {'uri':printer_uri, 'request_url':url, 'port':'/dev/tty.derp', 'baud_rate':250000}
 
 @pytest.fixture
-def connect_printer(comm, printer, mocker): #pylint: disable=redefined-outer-name
+def connect_printer(comm, printer, mocker, event_manager): #pylint: disable=redefined-outer-name, unused-argument
     mocker.patch('octoprint_authentise.comm.threading.Thread')
     mocker.patch('octoprint_authentise.comm.RepeatedTimer')
     mocker.patch("octoprint_authentise.comm.helpers.run_client")
@@ -81,6 +81,18 @@ def connect_printer(comm, printer, mocker): #pylint: disable=redefined-outer-nam
 @pytest.fixture
 def node_uuid():
     return uuid.uuid4()
+
+@pytest.fixture
+def event_manager(mocker):
+    manager = mocker.Mock()
+    mocker.patch('octoprint_authentise.comm.eventManager', return_value=manager)
+    return manager
+
+@pytest.fixture
+def set_time(mocker):
+    def __inner(_time):
+        mocker.patch('time.time', return_value=_time)
+    return __inner
 
 @pytest.yield_fixture
 def httpretty():
