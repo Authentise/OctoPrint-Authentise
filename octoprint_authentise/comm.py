@@ -148,7 +148,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
 
         self._printer_status_timer = RepeatedTimer(
             lambda: comm_helpers.get_interval("temperature", default_value=10.0),
-            self._poll_printer_status,
+            self._update_printer_data,
             run_first=True
         )
         self._printer_status_timer.start()
@@ -493,11 +493,6 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
             time.sleep(0.1)
         self._log("Connection closed, closing down monitor")
 
-    def _poll_printer_status(self):
-        if self.isOperational():
-            self.sendCommand("M105", cmd_type="temperature_poll")
-        self._update_printer_data()
-
     def _update_printer_data(self):
         if not self._printer_uri:
             return
@@ -526,11 +521,10 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
 
         if current_print and response_data['current_print']['status'].lower() != 'new':
             self._print_progress = {
-                'percent_complete' : current_print['percent_complete'],
+                'percent_complete' : current_print['percent_complete']/100,
                 'elapsed'          : current_print['elapsed'],
                 'remaining'        : current_print['remaining'],
             }
-
         else:
             self._print_progress = None
         self._callback.on_comm_progress()
