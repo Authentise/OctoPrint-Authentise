@@ -3,6 +3,7 @@ import json
 import Queue
 
 import pytest
+from octoprint.events import Events
 
 from octoprint_authentise import comm as _comm
 
@@ -311,12 +312,34 @@ def test_parse_temps(line, expected):
     actual = _comm.parse_temps(line)
     assert actual == expected
 
-def test_get_printer_status(comm, connect_printer): #pylint: disable=unused-argument
-    # comm._update_printer_data()
-    pass
 
-def test_change_state():
-    pass
+@pytest.mark.parametrize("old_state, new_state, event", [
+    (_comm.PRINTER_STATE['OFFLINE'], _comm.PRINTER_STATE['CONNECTING'], None),
+    (_comm.PRINTER_STATE['CONNECTING'], _comm.PRINTER_STATE['OPERATIONAL'], (Events.CONNECTED, {'port':'/dev/tty.derp', 'baudrate':250000})),
+    (_comm.PRINTER_STATE['PRINTING'], _comm.PRINTER_STATE['PAUSED'], (Events.PRINT_PAUSED, None)),
+    (_comm.PRINTER_STATE['PAUSED'], _comm.PRINTER_STATE['PRINTING'], (Events.PRINT_RESUMED, None)),
+    (_comm.PRINTER_STATE['OPERATIONAL'], _comm.PRINTER_STATE['PRINTING'], (Events.PRINT_STARTED, None)),
+    (_comm.PRINTER_STATE['PRINTING'], _comm.PRINTER_STATE['OPERATIONAL'], (Events.PRINT_DONE, None)),
+    (_comm.PRINTER_STATE['OPERATIONAL'], _comm.PRINTER_STATE['CLOSED'], (Events.DISCONNECTED,)),
+    (_comm.PRINTER_STATE['OPERATIONAL'], _comm.PRINTER_STATE['ERROR'], (Events.ERROR, {'error': None})),
+    (_comm.PRINTER_STATE['OPERATIONAL'], _comm.PRINTER_STATE['CLOSED_WITH_ERROR'], (Events.ERROR, {'error': None})),
+])
+def test_change_state(old_state, new_state, event, comm, connect_printer, mocker): #pylint: disable=unused-argument
+    event_fire_mock = mocker.Mock()
+    mocker.patch('octoprint_authentise.comm.eventManager', return_value=mocker.Mock(fire=event_fire_mock))
+
+    comm._state = old_state
+    comm._change_state(new_state)
+
+    assert comm._state == new_state
+    if event:
+        event_fire_mock.assert_called_once_with(*event)
+    else:
+        assert event_fire_mock.call_count == 0
 
 def test_send_command():
+    pass
+
+def test_get_printer_status(comm, connect_printer): #pylint: disable=unused-argument
+    # comm._update_printer_data()
     pass
