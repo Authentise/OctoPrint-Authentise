@@ -312,7 +312,6 @@ def test_parse_temps(line, expected):
     actual = _comm.parse_temps(line)
     assert actual == expected
 
-
 @pytest.mark.parametrize("old_state, new_state, event", [
     (_comm.PRINTER_STATE['OFFLINE'], _comm.PRINTER_STATE['CONNECTING'], None),
     (_comm.PRINTER_STATE['CONNECTING'], _comm.PRINTER_STATE['OPERATIONAL'], (Events.CONNECTED, {'port':'/dev/tty.derp', 'baudrate':250000})),
@@ -337,9 +336,162 @@ def test_change_state(old_state, new_state, event, comm, connect_printer, mocker
     else:
         assert event_fire_mock.call_count == 0
 
-def test_send_command():
-    pass
+### TESTS FOR VARIOUS GETTERS ###
+def test_getState(comm):
+    comm._state = _comm.PRINTER_STATE['OPERATIONAL']
+    assert comm.getState() == _comm.PRINTER_STATE['OPERATIONAL']
 
-def test_get_printer_status(comm, connect_printer): #pylint: disable=unused-argument
-    # comm._update_printer_data()
-    pass
+@pytest.mark.parametrize("state, state_string", [
+    (_comm.PRINTER_STATE['OFFLINE'], 'Offline'),
+    (_comm.PRINTER_STATE['CONNECTING'], 'Connecting'),
+    (_comm.PRINTER_STATE['OPERATIONAL'], 'Operational'),
+    (_comm.PRINTER_STATE['PRINTING'], 'Printing'),
+    (_comm.PRINTER_STATE['PAUSED'], 'Paused'),
+    (_comm.PRINTER_STATE['CLOSED'], 'Closed'),
+    (_comm.PRINTER_STATE['ERROR'], 'Error: None'),
+    (_comm.PRINTER_STATE['CLOSED_WITH_ERROR'], 'Error: None'),
+])
+def test_getStateString(comm, state, state_string):
+    comm._state = state
+    assert comm.getStateString() == state_string
+
+def test_getErrorString(comm):
+    comm._errorValue = 'some error!'
+    assert comm.getErrorString() == 'some error!'
+
+@pytest.mark.parametrize("state, result", [
+    (_comm.PRINTER_STATE['OFFLINE'], False),
+    (_comm.PRINTER_STATE['CONNECTING'], False),
+    (_comm.PRINTER_STATE['OPERATIONAL'], False),
+    (_comm.PRINTER_STATE['PRINTING'], False),
+    (_comm.PRINTER_STATE['PAUSED'], False),
+    (_comm.PRINTER_STATE['CLOSED'], True),
+    (_comm.PRINTER_STATE['ERROR'], True),
+    (_comm.PRINTER_STATE['CLOSED_WITH_ERROR'], True),
+])
+def test_isClosedOrError(state, result, comm):
+    comm._state = state
+    assert comm.isClosedOrError() == result
+
+@pytest.mark.parametrize("state, result", [
+    (_comm.PRINTER_STATE['OFFLINE'], False),
+    (_comm.PRINTER_STATE['CONNECTING'], False),
+    (_comm.PRINTER_STATE['OPERATIONAL'], False),
+    (_comm.PRINTER_STATE['PRINTING'], False),
+    (_comm.PRINTER_STATE['PAUSED'], False),
+    (_comm.PRINTER_STATE['CLOSED'], False),
+    (_comm.PRINTER_STATE['ERROR'], True),
+    (_comm.PRINTER_STATE['CLOSED_WITH_ERROR'], True),
+])
+def test_isError(state, result, comm):
+    comm._state = state
+    assert comm.isError() == result
+
+@pytest.mark.parametrize("state, result", [
+    (_comm.PRINTER_STATE['OFFLINE'], False),
+    (_comm.PRINTER_STATE['CONNECTING'], False),
+    (_comm.PRINTER_STATE['OPERATIONAL'], True),
+    (_comm.PRINTER_STATE['PRINTING'], True),
+    (_comm.PRINTER_STATE['PAUSED'], True),
+    (_comm.PRINTER_STATE['CLOSED'], False),
+    (_comm.PRINTER_STATE['ERROR'], False),
+    (_comm.PRINTER_STATE['CLOSED_WITH_ERROR'], False),
+])
+def test_isOperational(state, result, comm):
+    comm._state = state
+    assert comm.isOperational() == result
+
+@pytest.mark.parametrize("state, result", [
+    (_comm.PRINTER_STATE['OFFLINE'], False),
+    (_comm.PRINTER_STATE['CONNECTING'], False),
+    (_comm.PRINTER_STATE['OPERATIONAL'], False),
+    (_comm.PRINTER_STATE['PRINTING'], True),
+    (_comm.PRINTER_STATE['PAUSED'], False),
+    (_comm.PRINTER_STATE['CLOSED'], False),
+    (_comm.PRINTER_STATE['ERROR'], False),
+    (_comm.PRINTER_STATE['CLOSED_WITH_ERROR'], False),
+])
+def test_isPrinting(state, result, comm):
+    comm._state = state
+    assert comm.isPrinting() == result
+
+@pytest.mark.parametrize("state, result", [
+    (_comm.PRINTER_STATE['OFFLINE'], False),
+    (_comm.PRINTER_STATE['CONNECTING'], False),
+    (_comm.PRINTER_STATE['OPERATIONAL'], False),
+    (_comm.PRINTER_STATE['PRINTING'], False),
+    (_comm.PRINTER_STATE['PAUSED'], True),
+    (_comm.PRINTER_STATE['CLOSED'], False),
+    (_comm.PRINTER_STATE['ERROR'], False),
+    (_comm.PRINTER_STATE['CLOSED_WITH_ERROR'], False),
+])
+def test_isPaused(state, result, comm):
+    comm._state = state
+    assert comm.isPaused() == result
+
+@pytest.mark.parametrize("state, result", [
+    (_comm.PRINTER_STATE['OFFLINE'], False),
+    (_comm.PRINTER_STATE['CONNECTING'], False),
+    (_comm.PRINTER_STATE['OPERATIONAL'], False),
+    (_comm.PRINTER_STATE['PRINTING'], True),
+    (_comm.PRINTER_STATE['PAUSED'], True),
+    (_comm.PRINTER_STATE['CLOSED'], False),
+    (_comm.PRINTER_STATE['ERROR'], False),
+    (_comm.PRINTER_STATE['CLOSED_WITH_ERROR'], False),
+])
+def test_isBusy(state, result, comm):
+    comm._state = state
+    assert comm.isBusy() == result
+
+@pytest.mark.parametrize("state, result", [
+    (_comm.PRINTER_STATE['OFFLINE'], False),
+    (_comm.PRINTER_STATE['CONNECTING'], False),
+    (_comm.PRINTER_STATE['OPERATIONAL'], False),
+    (_comm.PRINTER_STATE['PRINTING'], False),
+    (_comm.PRINTER_STATE['PAUSED'], False),
+    (_comm.PRINTER_STATE['CLOSED'], False),
+    (_comm.PRINTER_STATE['ERROR'], False),
+    (_comm.PRINTER_STATE['CLOSED_WITH_ERROR'], False),
+])
+def test_isStreaming_isSdReady_isSdFileSelected_isSdPrinting(state, result, comm):
+    comm._state = state
+    assert comm.isStreaming() == result
+    assert comm.isSdReady() == result
+    assert comm.isSdFileSelected() == result
+    assert comm.isSdPrinting() == result
+
+def test_getSdFiles(comm):
+    assert not comm.getSdFiles()
+
+@pytest.mark.parametrize("progress, percent, time", [
+    ({'percent_complete': 0.112, 'elapsed': 54}, 0.112, 54),
+    (None, None, None),
+])
+def test_getPrintProgress_getPrintTime_getCleanedPrintTime(progress, percent, time, comm):
+    comm._print_progress = progress
+    assert comm.getPrintProgress() == percent
+    assert comm.getPrintTime() == time
+    assert comm.getCleanedPrintTime() == time
+
+def test_getPrintFilepos(comm):
+    assert not comm.getPrintFilepos()
+
+def test_getTemp(comm):
+    comm._tool_tempuratures = {0: [210.5, 215]}
+    assert comm.getTemp() == {0: [210.5, 215]}
+
+def test_getBedTemp(comm):
+    comm._bed_tempurature = [210.5, 215]
+    assert comm.getBedTemp() == [210.5, 215]
+
+def test_getOffsets(comm):
+    assert comm.getOffsets() == {}
+
+def test_getCurrentTool(comm):
+    assert comm.getCurrentTool() == 0
+
+def test_getConnection(comm, connect_printer): #pylint: disable=unused-argument
+    assert comm.getConnection() == ('/dev/tty.derp', 250000)
+
+def test_getTransport(comm):
+    assert not comm.getTransport()

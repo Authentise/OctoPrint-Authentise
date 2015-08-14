@@ -260,7 +260,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         return self._state == PRINTER_STATE['PRINTING']
 
     def isStreaming(self):
-        return
+        return False
 
     def isPaused(self):
         return self._state == PRINTER_STATE['PAUSED']
@@ -269,13 +269,13 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         return self.isPrinting() or self.isPaused()
 
     def isSdReady(self):
-        return
+        return False
 
     def isSdFileSelected(self):
-        return
+        return False
 
     def isSdPrinting(self):
-        return
+        return False
 
     def getSdFiles(self):
         return
