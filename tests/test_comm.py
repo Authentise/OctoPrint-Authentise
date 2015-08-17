@@ -563,6 +563,18 @@ def test_send_command_bad_response(comm, connect_printer, httpretty): #pylint: d
         comm._command_uri_queue.get_nowait()
     assert httpretty.last_request().body == json.dumps({'command': 'G1 X50 Y50'})
 
-def test_get_printer_status(comm, connect_printer): #pylint: disable=unused-argument
-    # comm._update_printer_data()
-    pass
+
+@pytest.mark.parametrize("response, expected_state", [
+    ({'status': 'new'     , 'current_print': {'status':'new'}}        , _comm.PRINTER_STATE['CONNECTING']),
+    ({'status': 'OFFLINE' , 'current_print': None}                    , _comm.PRINTER_STATE['CONNECTING']),
+    ({'status': 'ONLINE'  , 'current_print': None}                    , _comm.PRINTER_STATE['OPERATIONAL']),
+    ({'status': 'ONLINE'  , 'current_print': {'status':'new'}}        , _comm.PRINTER_STATE['OPERATIONAL']),
+    ({'status': 'ONLINE'  , 'current_print': {'status':'PRINTING'}}   , _comm.PRINTER_STATE['PRINTING']),
+    ({'status': 'ONLINE'  , 'current_print': {'status':'WARMING_UP'}} , _comm.PRINTER_STATE['PRINTING']),
+    ({'status': 'ONLINE'  , 'current_print': {'status':'PAUSED'}}     , _comm.PRINTER_STATE['PAUSED']),
+    ({'status': 'ONLINE'  , 'current_print': {'status':'WAT?'}}       , _comm.PRINTER_STATE['OFFLINE']),
+])
+def test_update_state(response, expected_state, comm, connect_printer): #pylint: disable=unused-argument
+    comm._state = _comm.PRINTER_STATE['OFFLINE']
+    comm._update_state(response)
+    assert comm._state == expected_state

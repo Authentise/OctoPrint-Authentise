@@ -529,7 +529,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         self._callback.on_comm_progress()
 
     def _update_state(self, response_data):
-        if response_data['status'].lower() in ['new', 'online']:
+        if response_data['status'].lower() == 'online':
             if not response_data['current_print'] or response_data['current_print']['status'].lower() == 'new':
                 self._change_state(PRINTER_STATE['OPERATIONAL'])
 
