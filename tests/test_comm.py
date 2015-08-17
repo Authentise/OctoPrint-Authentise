@@ -563,7 +563,6 @@ def test_send_command_bad_response(comm, connect_printer, httpretty): #pylint: d
         comm._command_uri_queue.get_nowait()
     assert httpretty.last_request().body == json.dumps({'command': 'G1 X50 Y50'})
 
-
 @pytest.mark.parametrize("response, expected_state", [
     ({'status': 'new'     , 'current_print': {'status':'new'}}        , _comm.PRINTER_STATE['CONNECTING']),
     ({'status': 'OFFLINE' , 'current_print': None}                    , _comm.PRINTER_STATE['CONNECTING']),
@@ -597,3 +596,69 @@ def test_update_temps(response, expected_temps, comm):
     comm._update_temps(response)
     assert comm._tool_tempuratures == expected_temps
     assert comm._bed_tempurature == None
+
+def test_update_printer_data_ok_response(comm, connect_printer, httpretty, assert_almost_equal): #pylint: disable=unused-argument
+    comm._state = _comm.PRINTER_STATE['CONNECTING']
+    comm._tool_tempuratures = None
+    comm._bed_tempurature = None
+    comm._print_progress = None
+
+    printer_payload = {"baud_rate": 250000,
+                       "port": "/dev/tty.derp",
+                       "uri": comm._printer_uri,
+                       'status': 'ONLINE',
+                       'nozzle_temperature': 185.9,
+                       'current_print': {
+                           'status': 'PRINTING',
+                           'percent_complete': 10.55,
+                           'elapsed': 30,
+                           'remaining': 0.4,
+                       }}
+
+    httpretty.register_uri(httpretty.GET,
+                           comm._printer_uri,
+                           status=200,
+                           body=json.dumps(printer_payload),
+                           content_type='application/json')
+
+    comm._update_printer_data()
+
+    assert comm._state == _comm.PRINTER_STATE['PRINTING']
+    assert comm._tool_tempuratures == {0: [185.9, None]}
+    assert comm._bed_tempurature == None
+    assert_almost_equal(comm._print_progress, {'percent_complete': 0.1055, 'elapsed': 30, 'remaining': 0.4})
+
+def test_update_printer_data_bad_response(comm, connect_printer, httpretty): #pylint: disable=unused-argument
+    comm._state = _comm.PRINTER_STATE['CONNECTING']
+    comm._tool_tempuratures = None
+    comm._bed_tempurature = None
+    comm._print_progress = None
+
+    printer_payload = {}
+
+    httpretty.register_uri(httpretty.GET,
+                           comm._printer_uri,
+                           status=400,
+                           body=json.dumps(printer_payload),
+                           content_type='application/json')
+
+    comm._update_printer_data()
+
+    assert comm._state == _comm.PRINTER_STATE['CONNECTING']
+    assert comm._tool_tempuratures == None
+    assert comm._bed_tempurature == None
+    assert comm._print_progress == None
+
+def test_update_printer_data_no_print_uri(comm):
+    comm._state = _comm.PRINTER_STATE['CONNECTING']
+    comm._printer_uri = None
+    comm._tool_tempuratures = None
+    comm._bed_tempurature = None
+    comm._print_progress = None
+
+    comm._update_printer_data()
+
+    assert comm._state == _comm.PRINTER_STATE['CONNECTING']
+    assert comm._tool_tempuratures == None
+    assert comm._bed_tempurature == None
+    assert comm._print_progress == None

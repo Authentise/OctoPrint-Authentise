@@ -56,7 +56,15 @@ def printer(comm, node_uuid, settings, httpretty): #pylint: disable=redefined-ou
 
     printer_payload = {"baud_rate": 250000,
                        "port": "/dev/tty.derp",
-                       "uri": printer_uri}
+                       "uri": printer_uri,
+                       'status': 'ONLINE',
+                       'nozzle_temperature': 185.9,
+                       'current_print': {
+                           'status': 'PRINTING',
+                           'percent_complete': 10.55,
+                           'elapsed': 30,
+                           'remaining': 0.4,
+                       }}
 
     httpretty.register_uri(httpretty.GET,
                            url,
