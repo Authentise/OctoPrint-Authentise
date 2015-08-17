@@ -588,3 +588,12 @@ def test_update_state(response, expected_state, comm):
 def test_update_progress(response, expected_progress, comm, assert_almost_equal):
     comm._update_progress(response)
     assert_almost_equal(comm._print_progress, expected_progress)
+
+@pytest.mark.parametrize("response, expected_temps", [
+    ({'nozzle_temperature':0}, {0: [0, None]}),
+    ({'nozzle_temperature':180.9}, {0: [180.9, None]}),
+])
+def test_update_temps(response, expected_temps, comm):
+    comm._update_temps(response)
+    assert comm._tool_tempuratures == expected_temps
+    assert comm._bed_tempurature == None
