@@ -103,3 +103,39 @@ def httpretty():
     HTTPretty.disable()
     socket.SocketType = old_socket_type
     HTTPretty.reset()
+
+@pytest.fixture
+def assert_almost_equal():
+    def __inner(value_0, value_1, places=4):
+        if value_0 != value_1:
+            value_0 = cut_insignificant_digits_recursively(value_0, places)
+            value_1 = cut_insignificant_digits_recursively(value_1, places)
+        assert value_0 == value_1
+    return __inner
+
+#these fucntions are for very basic asserting almost equal, taken from and answer in
+#http://stackoverflow.com/questions/12136762/assertalmostequal-in-python-unit-test-for-collections-of-floats
+def cut_insignificant_digits(number, places):
+    if not isinstance(number, float):
+        return number
+    number_as_str = str(number)
+    end_of_number = number_as_str.find('.')+places+1
+    if end_of_number > len(number_as_str):
+        return number
+    return float(number_as_str[:end_of_number])
+
+def cut_insignificant_digits_lazy(iterable, places):
+    for obj in iterable:
+        yield cut_insignificant_digits_recursively(obj, places)
+
+def cut_insignificant_digits_recursively(obj, places):
+    t = type(obj)
+    if t == float:
+        return cut_insignificant_digits(obj, places)
+    if t in (list, tuple, set):
+        return t(cut_insignificant_digits_lazy(obj, places))
+    if t == dict:
+        return {cut_insignificant_digits_recursively(key, places):
+                cut_insignificant_digits_recursively(val, places)
+                for key,val in obj.items()}
+    return obj

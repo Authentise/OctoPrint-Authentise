@@ -574,7 +574,17 @@ def test_send_command_bad_response(comm, connect_printer, httpretty): #pylint: d
     ({'status': 'ONLINE'  , 'current_print': {'status':'PAUSED'}}     , _comm.PRINTER_STATE['PAUSED']),
     ({'status': 'ONLINE'  , 'current_print': {'status':'WAT?'}}       , _comm.PRINTER_STATE['OFFLINE']),
 ])
-def test_update_state(response, expected_state, comm, connect_printer): #pylint: disable=unused-argument
+def test_update_state(response, expected_state, comm):
     comm._state = _comm.PRINTER_STATE['OFFLINE']
     comm._update_state(response)
     assert comm._state == expected_state
+
+@pytest.mark.parametrize("response, expected_progress", [
+    ({'current_print': {'status':'new'}}, None),
+    ({'current_print': {'status':'PRINTING', 'percent_complete': 23.55, 'elapsed': 54, 'remaining': 66.3}}, {'percent_complete': 0.2355, 'elapsed': 54, 'remaining': 66.3}),
+    ({'current_print': {'status':'WARMING_UP', 'percent_complete': 43.1, 'elapsed': 40, 'remaining': 66.3}}, {'percent_complete': 0.431, 'elapsed': 40, 'remaining': 66.3}),
+    ({'current_print': {'status':'PAUSED', 'percent_complete': 23.55, 'elapsed': 54, 'remaining': 66.3}}, {'percent_complete': 0.2355, 'elapsed': 54, 'remaining': 66.3}),
+])
+def test_update_progress(response, expected_progress, comm, assert_almost_equal):
+    comm._update_progress(response)
+    assert_almost_equal(comm._print_progress, expected_progress)
