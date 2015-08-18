@@ -218,10 +218,12 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
             # New print
             elif new_state == PRINTER_STATE['PRINTING']:
                 eventManager().fire(Events.PRINT_STARTED, None)
+                self._callback.on_comm_set_job_data('Authentise Streaming Print', 10000, None)
 
             # It is not easy to tell the difference between an completed print and a cancled print at this point
             elif new_state == PRINTER_STATE['OPERATIONAL'] and old_state != PRINTER_STATE['CONNECTING']:
                 eventManager().fire(Events.PRINT_DONE, None)
+                self._callback.on_comm_set_job_data(None, None, None)
 
         elif new_state == PRINTER_STATE['CLOSED']:
             eventManager().fire(Events.DISCONNECTED)
@@ -284,7 +286,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         return self._print_progress['percent_complete'] if self._print_progress else None
 
     def getPrintFilepos(self):
-        return
+        return int(self._print_progress['percent_complete']*10000) if self._print_progress else None
 
     def getPrintTime(self):
         return self._print_progress['elapsed'] if self._print_progress else None
@@ -510,9 +512,18 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         self._update_progress(response_data)
 
     def _update_temps(self, response_data):
-        nozzle_temp = response_data['nozzle_temperature']
-        self._tool_tempuratures = {0: [nozzle_temp, None]}
-        self._bed_tempurature = None
+        temps = response_data['temperatures']
+
+        self._tool_tempuratures = {0: [
+                temps['extruder1'].get('current') if temps.get('extruder1') else None,
+                temps['extruder1'].get('target') if temps.get('extruder1') else None,
+            ]}
+
+        self._bed_tempurature = [
+                temps['bed'].get('current') if temps.get('bed') else None,
+                temps['bed'].get('target') if temps.get('bed') else None,
+                ]
+
         self._callback.on_comm_temperature_update(self._tool_tempuratures, self._bed_tempurature)
 
     def _update_progress(self, response_data):
@@ -524,9 +535,15 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
                 'elapsed'          : current_print['elapsed'],
                 'remaining'        : current_print['remaining'],
             }
+            self._callback.on_comm_set_progress_data(
+                    current_print['percent_complete'],
+                    current_print['percent_complete']*100 if current_print['percent_complete'] else None,
+                    current_print['elapsed'],
+                    current_print['remaining'],
+                    )
         else:
             self._print_progress = None
-        self._callback.on_comm_progress()
+            self._callback.on_comm_set_progress_data(None, None, None, None)
 
     def _update_state(self, response_data):
         if response_data['status'].lower() == 'online':
