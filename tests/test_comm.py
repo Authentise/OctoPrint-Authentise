@@ -578,24 +578,26 @@ def test_update_state(response, expected_state, comm):
     comm._update_state(response)
     assert comm._state == expected_state
 
-@pytest.mark.parametrize("response, expected_progress", [
-    ({'current_print': {'status':'new'}}, None),
-    ({'current_print': {'status':'PRINTING', 'percent_complete': 23.55, 'elapsed': 54, 'remaining': 66.3}}, {'percent_complete': 0.2355, 'elapsed': 54, 'remaining': 66.3}),
-    ({'current_print': {'status':'WARMING_UP', 'percent_complete': 43.1, 'elapsed': 40, 'remaining': 66.3}}, {'percent_complete': 0.431, 'elapsed': 40, 'remaining': 66.3}),
-    ({'current_print': {'status':'PAUSED', 'percent_complete': 23.55, 'elapsed': 54, 'remaining': 66.3}}, {'percent_complete': 0.2355, 'elapsed': 54, 'remaining': 66.3}),
+@pytest.mark.parametrize("response, expected_progress, expected_callback", [
+    ({'current_print': {'status':'new'}}, None, [None, None, None, None]),
+    ({'current_print': {'status':'PRINTING', 'percent_complete': 23.55, 'elapsed': 54, 'remaining': 66.3}}, {'percent_complete': 0.2355, 'elapsed': 54, 'remaining': 66.3}, [23.55, 2355, 54, 66.3]),
+    ({'current_print': {'status':'WARMING_UP', 'percent_complete': 43.1, 'elapsed': 40, 'remaining': 66.3}}, {'percent_complete': 0.431, 'elapsed': 40, 'remaining': 66.3}, [43.1, 4310, 40, 66.3]),
+    ({'current_print': {'status':'PAUSED', 'percent_complete': 23.56, 'elapsed': 54, 'remaining': 66.3}}, {'percent_complete': 0.2356, 'elapsed': 54, 'remaining': 66.3}, [23.56, 2356, 54, 66.3]),
 ])
-def test_update_progress(response, expected_progress, comm, assert_almost_equal):
+def test_update_progress(response, expected_progress, expected_callback, comm, assert_almost_equal):
     comm._update_progress(response)
     assert_almost_equal(comm._print_progress, expected_progress)
+    comm._callback.on_comm_set_progress_data.assert_called_once_with(*expected_callback)
 
-@pytest.mark.parametrize("response, expected_temps", [
-    ({'nozzle_temperature':0}, {0: [0, None]}),
-    ({'nozzle_temperature':180.9}, {0: [180.9, None]}),
+@pytest.mark.parametrize("response, expected_temps, expected_bed", [
+    ({'temperatures':{'extruder1':{'current':0}}}, {0: [0, None]}, None),
+    ({'temperatures':{'extruder1':{'current':180.9, 'target':200}}}, {0: [180.9, 200]}, None),
+    ({'temperatures':{'extruder1':{'current':180.9}, 'bed':{'current':30.5, 'target':50.1}}}, {0: [180.9, None]}, [30.5, 50.1]),
 ])
-def test_update_temps(response, expected_temps, comm):
+def test_update_temps(response, expected_temps, expected_bed, comm):
     comm._update_temps(response)
     assert comm._tool_tempuratures == expected_temps
-    assert comm._bed_tempurature == None
+    assert comm._bed_tempurature == expected_bed
 
 def test_update_printer_data_ok_response(comm, connect_printer, httpretty, assert_almost_equal): #pylint: disable=unused-argument
     comm._state = _comm.PRINTER_STATE['CONNECTING']
@@ -607,7 +609,7 @@ def test_update_printer_data_ok_response(comm, connect_printer, httpretty, asser
                        "port": "/dev/tty.derp",
                        "uri": comm._printer_uri,
                        'status': 'ONLINE',
-                       'nozzle_temperature': 185.9,
+                       'temperatures':{'extruder1': {'current':185.9}},
                        'current_print': {
                            'status': 'PRINTING',
                            'percent_complete': 10.55,

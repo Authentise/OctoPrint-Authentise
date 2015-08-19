@@ -522,7 +522,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         self._bed_tempurature = [
                 temps['bed'].get('current') if temps.get('bed') else None,
                 temps['bed'].get('target') if temps.get('bed') else None,
-                ]
+                ] if temps.get('bed') else None
 
         self._callback.on_comm_temperature_update(self._tool_tempuratures, self._bed_tempurature)
 
