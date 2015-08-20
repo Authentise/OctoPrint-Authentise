@@ -82,6 +82,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
     _port = None
     _baudrate = None
     _printer_uri = None
+    _print_job_uri = None
 
     _authentise_process = None
     _authentise_model = None
@@ -329,6 +330,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         if self._authentise_process:
             self._authentise_process.send_signal(2) #send the SIGINT signal
 
+        self._print_job_uri = None
         self._change_state(PRINTER_STATE['CLOSED'])
 
     def setTemperatureOffset(self, offsets):
@@ -505,6 +507,11 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
             return
 
         response_data = response.json()
+
+        if response_data['current_print'] and response_data['current_print']['status'].lower() != 'new':
+            self._print_job_uri = response_data['current_print']['job_uri']
+        else:
+            self._print_job_uri = None
 
         self._update_state(response_data)
         self._update_temps(response_data)
