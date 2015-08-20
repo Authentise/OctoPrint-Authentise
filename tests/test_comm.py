@@ -569,17 +569,11 @@ def test_send_command_bad_response(comm, connect_printer, httpretty): #pylint: d
     'PRINTING',
     'PAUSED',
 ])
-def test_cancelPrint_print_in_progress(printer_status, comm, connect_printer, httpretty): #pylint: disable=unused-argument
+def test_cancelPrint_print_in_progress(printer_status, comm, mocker):
+    comm._send_pause_cancel_request = mocker.Mock()
     comm._state = _comm.PRINTER_STATE[printer_status]
-    comm._print_job_uri = 'http://test.uri.com/job/1234/'
-
-    httpretty.register_uri(httpretty.PUT,
-                           comm._print_job_uri,
-                           status=204,
-                           content_type='application/json')
-
     comm.cancelPrint()
-    assert httpretty.last_request().body == json.dumps({'status': 'cancel'})
+    comm._send_pause_cancel_request.assert_called_once_with('cancel')
 
 @pytest.mark.parametrize("printer_status", [
     'OFFLINE',
@@ -587,9 +581,32 @@ def test_cancelPrint_print_in_progress(printer_status, comm, connect_printer, ht
     'OPERATIONAL',
     'CLOSED',
 ])
-def test_cancelPrint_not_printing(printer_status, comm, connect_printer, httpretty): #pylint: disable=unused-argument
-    httpretty.reset()
+def test_cancelPrint_not_printing(printer_status, comm, mocker):
+    comm._send_pause_cancel_request = mocker.Mock()
     comm._state = _comm.PRINTER_STATE[printer_status]
+    comm.cancelPrint()
+    assert comm._send_pause_cancel_request.call_count == 0
+
+def test_send_pause_cancel_request_no_print_uri(comm, httpretty):
+    httpretty.reset()
+    comm._print_job_uri = None
+
+    comm._send_pause_cancel_request('cancel')
+    assert not httpretty.has_request()
+
+def test_send_pause_cancel_request_bad_print_url(comm, httpretty):
+    httpretty.reset()
+    comm._print_job_uri = 'http://not-a-good-url/'
+
+    comm._send_pause_cancel_request('resume')
+    assert httpretty.last_request().body == json.dumps({'status': 'resume'})
+
+@pytest.mark.parametrize("status", [
+    'resume',
+    'paused',
+    'cancel',
+])
+def test_send_pause_cancel_request_normal_status(status, comm, httpretty):
     comm._print_job_uri = 'http://test.uri.com/job/1234/'
 
     httpretty.register_uri(httpretty.PUT,
@@ -597,24 +614,8 @@ def test_cancelPrint_not_printing(printer_status, comm, connect_printer, httpret
                            status=204,
                            content_type='application/json')
 
-    comm.cancelPrint()
-    assert not httpretty.has_request()
-
-def test_cancelPrint_no_print_uri(comm, connect_printer, httpretty): #pylint: disable=unused-argument
-    httpretty.reset()
-    comm._state = _comm.PRINTER_STATE['PRINTING']
-    comm._print_job_uri = None
-
-    comm.cancelPrint()
-    assert not httpretty.has_request()
-
-def test_cancelPrint_bad_print_url(comm, connect_printer, httpretty): #pylint: disable=unused-argument
-    httpretty.reset()
-    comm._state = _comm.PRINTER_STATE['PRINTING']
-    comm._print_job_uri = 'http://not-a-good-url/'
-
-    comm.cancelPrint()
-    assert httpretty.last_request().body == json.dumps({'status': 'cancel'})
+    comm._send_pause_cancel_request(status)
+    assert httpretty.last_request().body == json.dumps({'status': status})
 
 @pytest.mark.parametrize("response, expected_state", [
     ({'status': 'new'     , 'current_print': {'status':'new'}}        , _comm.PRINTER_STATE['CONNECTING']),

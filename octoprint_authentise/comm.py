@@ -383,14 +383,16 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
     def unselectFile(self):
         pass
 
+    def _send_pause_cancel_request(self, status):
+        try:
+            self._session.put(self._print_job_uri, json={'status':status})
+        except (requests.exceptions.MissingSchema, requests.exceptions.ConnectionError) as e:
+            self._log('Request to {} generated error: {}'.format(self._print_job_uri, e))
+
     def cancelPrint(self):
         if not self.isPrinting() and not self.isPaused():
             return
-
-        try:
-            self._session.put(self._print_job_uri, json={'status':'cancel'})
-        except (requests.exceptions.MissingSchema, requests.exceptions.ConnectionError) as e:
-            self._log('Request to {} generated error: {}'.format(self._print_job_uri, e))
+        self._send_pause_cancel_request('cancel')
 
     def setPause(self, pause):
         if not pause and self.isPaused():
