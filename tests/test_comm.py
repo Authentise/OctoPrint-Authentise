@@ -564,28 +564,41 @@ def test_send_command_bad_response(comm, connect_printer, httpretty): #pylint: d
         comm._command_uri_queue.get_nowait()
     assert httpretty.last_request().body == json.dumps({'command': 'G1 X50 Y50'})
 
-
-@pytest.mark.parametrize("printer_status", [
-    'PRINTING',
-    'PAUSED',
+@pytest.mark.parametrize("printer_status, request_status", [
+    ('PRINTING', 'cancel'),
+    ('PAUSED', 'cancel'),
+    ('OFFLINE', None),
+    ('CONNECTING', None),
+    ('OPERATIONAL', None),
+    ('CLOSED', None),
 ])
-def test_cancelPrint_print_in_progress(printer_status, comm, mocker):
+def test_cancelPrint(printer_status, request_status, comm, mocker):
     comm._send_pause_cancel_request = mocker.Mock()
     comm._state = _comm.PRINTER_STATE[printer_status]
     comm.cancelPrint()
-    comm._send_pause_cancel_request.assert_called_once_with('cancel')
+    if request_status:
+        comm._send_pause_cancel_request.assert_called_once_with(request_status)
+    else:
+        assert comm._send_pause_cancel_request.call_count == 0
 
-@pytest.mark.parametrize("printer_status", [
-    'OFFLINE',
-    'CONNECTING',
-    'OPERATIONAL',
-    'CLOSED',
+@pytest.mark.parametrize("printer_status, request_status, pause", [
+    ('PRINTING', 'pause', True),
+    ('PRINTING', None, False),
+    ('PAUSED', 'resume', False),
+    ('PAUSED', None, True),
+    ('OFFLINE', None, False),
+    ('CONNECTING', None, False),
+    ('OPERATIONAL', None, False),
+    ('CLOSED', None, False),
 ])
-def test_cancelPrint_not_printing(printer_status, comm, mocker):
+def test_setPause(printer_status, request_status, pause, comm, mocker):
     comm._send_pause_cancel_request = mocker.Mock()
     comm._state = _comm.PRINTER_STATE[printer_status]
-    comm.cancelPrint()
-    assert comm._send_pause_cancel_request.call_count == 0
+    comm.setPause(pause)
+    if request_status:
+        comm._send_pause_cancel_request.assert_called_once_with(request_status)
+    else:
+        assert comm._send_pause_cancel_request.call_count == 0
 
 def test_send_pause_cancel_request_no_print_uri(comm, httpretty):
     httpretty.reset()

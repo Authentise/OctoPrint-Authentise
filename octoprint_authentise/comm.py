@@ -396,14 +396,10 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
 
     def setPause(self, pause):
         if not pause and self.isPaused():
-            # send resume command to authentise
-            # self._change_state(PRINTER_STATE['PRINTING'])
-            pass
+            self._send_pause_cancel_request('resume')
 
         elif pause and self.isPrinting():
-            # send pause command to authentise
-            # self._change_state(PRINTER_STATE['PAUSED'])
-            pass
+            self._send_pause_cancel_request('pause')
 
     def sendGcodeScript(self, scriptName, replacements=None):
         return
