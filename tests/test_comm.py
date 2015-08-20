@@ -564,6 +564,58 @@ def test_send_command_bad_response(comm, connect_printer, httpretty): #pylint: d
         comm._command_uri_queue.get_nowait()
     assert httpretty.last_request().body == json.dumps({'command': 'G1 X50 Y50'})
 
+
+@pytest.mark.parametrize("printer_status", [
+    'PRINTING',
+    'PAUSED',
+])
+def test_cancelPrint_print_in_progress(printer_status, comm, connect_printer, httpretty): #pylint: disable=unused-argument
+    comm._state = _comm.PRINTER_STATE[printer_status]
+    comm._print_job_uri = 'http://test.uri.com/job/1234/'
+
+    httpretty.register_uri(httpretty.PUT,
+                           comm._print_job_uri,
+                           status=204,
+                           content_type='application/json')
+
+    comm.cancelPrint()
+    assert httpretty.last_request().body == json.dumps({'status': 'cancel'})
+
+@pytest.mark.parametrize("printer_status", [
+    'OFFLINE',
+    'CONNECTING',
+    'OPERATIONAL',
+    'CLOSED',
+])
+def test_cancelPrint_not_printing(printer_status, comm, connect_printer, httpretty): #pylint: disable=unused-argument
+    httpretty.reset()
+    comm._state = _comm.PRINTER_STATE[printer_status]
+    comm._print_job_uri = 'http://test.uri.com/job/1234/'
+
+    httpretty.register_uri(httpretty.PUT,
+                           comm._print_job_uri,
+                           status=204,
+                           content_type='application/json')
+
+    comm.cancelPrint()
+    assert not httpretty.has_request()
+
+def test_cancelPrint_no_print_uri(comm, connect_printer, httpretty): #pylint: disable=unused-argument
+    httpretty.reset()
+    comm._state = _comm.PRINTER_STATE['PRINTING']
+    comm._print_job_uri = None
+
+    comm.cancelPrint()
+    assert not httpretty.has_request()
+
+def test_cancelPrint_bad_print_url(comm, connect_printer, httpretty): #pylint: disable=unused-argument
+    httpretty.reset()
+    comm._state = _comm.PRINTER_STATE['PRINTING']
+    comm._print_job_uri = 'http://not-a-good-url/'
+
+    comm.cancelPrint()
+    assert httpretty.last_request().body == json.dumps({'status': 'cancel'})
+
 @pytest.mark.parametrize("response, expected_state", [
     ({'status': 'new'     , 'current_print': {'status':'new'}}        , _comm.PRINTER_STATE['CONNECTING']),
     ({'status': 'OFFLINE' , 'current_print': None}                    , _comm.PRINTER_STATE['CONNECTING']),

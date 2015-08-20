@@ -10,6 +10,7 @@ import urlparse
 from urllib import quote_plus
 
 import octoprint.plugin
+import requests
 from octoprint.events import Events, eventManager
 from octoprint.settings import settings
 from octoprint.util import RepeatedTimer, comm_helpers
@@ -386,9 +387,10 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         if not self.isPrinting() and not self.isPaused():
             return
 
-        # send cancel command to authentise
-        # self._change_state(PRINTER_STATE['OPERATIONAL'])
-        # eventManager().fire(Events.PRINT_CANCELLED, payload)
+        try:
+            self._session.put(self._print_job_uri, json={'status':'cancel'})
+        except (requests.exceptions.MissingSchema, requests.exceptions.ConnectionError) as e:
+            self._log('Request to {} generated error: {}'.format(self._print_job_uri, e))
 
     def setPause(self, pause):
         if not pause and self.isPaused():
