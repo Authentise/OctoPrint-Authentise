@@ -10,10 +10,9 @@ import urlparse
 from urllib import quote_plus
 
 import octoprint.plugin
-import requests
 from octoprint.events import Events, eventManager
 from octoprint.settings import settings
-from octoprint.util import RepeatedTimer, comm_helpers, get_exception_string
+from octoprint.util import RepeatedTimer, comm_helpers
 
 from octoprint_authentise import helpers
 
@@ -21,6 +20,17 @@ __author__ = "Scott Lemmon <scott@authentise.com> based on work by Gina Häußge
 __license__ = "GNU Affero General Public License http://www.gnu.org/licenses/agpl.html"
 __copyright__ = "Copyright (C) 2015 Authentise - Released under terms of the AGPLv3 License"
 
+PRINTER_STATE = {
+    'OFFLINE'           : octoprint.plugin.MachineComPlugin.STATE_NONE,
+    'CONNECTING'        : octoprint.plugin.MachineComPlugin.STATE_CONNECTING,
+    'OPERATIONAL'       : octoprint.plugin.MachineComPlugin.STATE_OPERATIONAL,
+    'PRINTING'          : octoprint.plugin.MachineComPlugin.STATE_PRINTING,
+    'PAUSED'            : octoprint.plugin.MachineComPlugin.STATE_PAUSED,
+    'CLOSED'            : octoprint.plugin.MachineComPlugin.STATE_CLOSED,
+    'ERROR'             : octoprint.plugin.MachineComPlugin.STATE_ERROR,
+    'CLOSED_WITH_ERROR' : octoprint.plugin.MachineComPlugin.STATE_CLOSED_WITH_ERROR,
+    }
+PRINTER_STATE_REVERSE = dict((v,k) for k,v in PRINTER_STATE.items())
 
 FLOAT_RE = r'[-+]?\d*\.?\d+'
 JUNK_RE = r'(?:\s+.*?\s*)?'
@@ -77,12 +87,15 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
     _authentise_model = None
 
     _authentise_url = None
-    _api_key = None
-    _api_secret = None
+    _session = None
 
     _command_uri_queue = None
 
-    _temperature_timer = None
+    _printer_status_timer = None
+    _tool_tempuratures = None
+    _bed_tempurature = None
+
+    _print_progress = None
 
     _callback = None
     _printer_profile_manager = None
@@ -109,8 +122,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         self._printer_profile_manager = printerProfileManager
 
         self._authentise_url = self._settings.get(['authentise_url']) #pylint: disable=no-member
-        self._api_key = self._settings.get(['api_key']) #pylint: disable=no-member
-        self._api_secret = self._settings.get(['api_secret']) #pylint: disable=no-member
+        self._session = helpers.session(self._settings) #pylint: disable=no-member
 
     def connect(self, port=None, baudrate=None):
         if port == None:
@@ -134,17 +146,14 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         self.monitoring_thread.daemon = True
         self.monitoring_thread.start()
 
-        self._temperature_timer = RepeatedTimer(
-            lambda: comm_helpers.get_interval("temperature", default_value=4.0),
-            self._poll_temperature,
+        self._printer_status_timer = RepeatedTimer(
+            lambda: comm_helpers.get_interval("temperature", default_value=10.0),
+            self._update_printer_data,
             run_first=True
         )
-        self._temperature_timer.start()
+        self._printer_status_timer.start()
 
-        payload = dict(port=self._port, baudrate=self._baudrate)
-        self._changeState(self.STATE_OPERATIONAL)
-
-        eventManager().fire(Events.CONNECTED, payload)
+        self._change_state(PRINTER_STATE['CONNECTING'])
 
     def _get_or_create_printer(self, port, baud_rate):
         client_url = urlparse.urljoin(self._authentise_url, '/client/{}/'.format(self.node_uuid)) #pylint: disable=no-member
@@ -154,7 +163,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         target_printer = None
         self._log('Getting printer list from: {}'.format(url))
 
-        printer_get_resp = requests.get(url=url, auth=(self._api_key, self._api_secret))
+        printer_get_resp = self._session.get(url=url)
 
         for printer in printer_get_resp.json()["resources"]:
             if printer['port'] == port:
@@ -164,7 +173,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
 
         if target_printer:
             if target_printer['baud_rate'] != baud_rate:
-                requests.put(target_printer["uri"], json={'baud_rate': baud_rate})
+                self._session.put(target_printer["uri"], json={'baud_rate': baud_rate})
 
             return target_printer['uri']
         else:
@@ -175,22 +184,52 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
                        'name': 'Octoprint Printer',
                        'port': port,
                        'baud_rate': baud_rate}
-            create_printer_resp = requests.post(urlparse.urljoin(self._authentise_url,
+            create_printer_resp = self._session.post(urlparse.urljoin(self._authentise_url,
                                                                  '/printer/instance/'),
-                                                json=payload,
-                                                auth=(self._api_key, self._api_secret))
+                                                json=payload)
             return create_printer_resp.headers["Location"]
 
     # #~~ internal state management
 
-    def _changeState(self, newState):
-        if self._state == newState:
+    def _change_state(self, new_state):
+        # Change the printer state
+        if self._state == new_state:
             return
 
-        oldState = self.getStateString()
-        self._state = newState
-        self._log('Changing monitoring state from \'%s\' to \'%s\'' % (oldState, self.getStateString()))
-        self._callback.on_comm_state_change(newState)
+        old_state = self._state
+        old_state_string = self.getStateString()
+        self._state = new_state
+        self._log("Changed printer state from '{}' to '{}'".format(old_state_string, self.getStateString()))
+        self._callback.on_comm_state_change(new_state)
+
+        # Deal with firing nessesary events
+        if new_state in [PRINTER_STATE['OPERATIONAL'], PRINTER_STATE['PRINTING'], PRINTER_STATE['PAUSED']]:
+            # Send connected event if needed
+            if old_state == PRINTER_STATE['CONNECTING']:
+                payload = dict(port=self._port, baudrate=self._baudrate)
+                eventManager().fire(Events.CONNECTED, payload)
+
+            # Pausing and resuming printing
+            if new_state == PRINTER_STATE['PAUSED']:
+                eventManager().fire(Events.PRINT_PAUSED, None)
+            elif new_state == PRINTER_STATE['PRINTING'] and old_state == PRINTER_STATE['PAUSED']:
+                eventManager().fire(Events.PRINT_RESUMED, None)
+
+            # New print
+            elif new_state == PRINTER_STATE['PRINTING']:
+                eventManager().fire(Events.PRINT_STARTED, None)
+                self._callback.on_comm_set_job_data('Authentise Streaming Print', 10000, None)
+
+            # It is not easy to tell the difference between an completed print and a cancled print at this point
+            elif new_state == PRINTER_STATE['OPERATIONAL'] and old_state != PRINTER_STATE['CONNECTING']:
+                eventManager().fire(Events.PRINT_DONE, None)
+                self._callback.on_comm_set_job_data(None, None, None)
+
+        elif new_state == PRINTER_STATE['CLOSED']:
+            eventManager().fire(Events.DISCONNECTED)
+
+        elif new_state in [PRINTER_STATE['ERROR'], PRINTER_STATE['CLOSED_WITH_ERROR']]:
+            eventManager().fire(Events.ERROR, {"error": self.getErrorString()})
 
     def _log(self, message):
         self._callback.on_comm_log(message)
@@ -202,88 +241,64 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         return self._state
 
     def getStateString(self): #pylint: disable=too-many-return-statements
-        if self._state == self.STATE_NONE:
-            return "Offline"
-        if self._state == self.STATE_OPEN_SERIAL:
-            return "Opening serial port"
-        if self._state == self.STATE_DETECT_SERIAL:
-            return "Detecting serial port"
-        if self._state == self.STATE_DETECT_BAUDRATE:
-            return "Detecting baudrate"
-        if self._state == self.STATE_CONNECTING:
-            return "Connecting"
-        if self._state == self.STATE_OPERATIONAL:
-            return "Operational"
-        if self._state == self.STATE_PRINTING:
-            return "Printing"
-        if self._state == self.STATE_PAUSED:
-            return "Paused"
-        if self._state == self.STATE_CLOSED:
-            return "Closed"
-        if self._state == self.STATE_ERROR:
-            return "Error: %s" % (self.getErrorString())
-        if self._state == self.STATE_CLOSED_WITH_ERROR:
-            return "Error: %s" % (self.getErrorString())
-        if self._state == self.STATE_TRANSFERING_FILE:
-            return "Transfering file to SD"
-        return "?%d?" % (self._state)
+        if self._state in [PRINTER_STATE['ERROR'], PRINTER_STATE['CLOSED_WITH_ERROR']]:
+            return "Error: {}".format(self.getErrorString())
+
+        return PRINTER_STATE_REVERSE[self._state].title()
 
     def getErrorString(self):
         return self._errorValue
 
     def isClosedOrError(self):
-        return self._state == self.STATE_ERROR or self._state == self.STATE_CLOSED_WITH_ERROR or self._state == self.STATE_CLOSED
+        return self._state in [PRINTER_STATE['ERROR'], PRINTER_STATE['CLOSED_WITH_ERROR'], PRINTER_STATE['CLOSED']]
 
     def isError(self):
-        return self._state == self.STATE_ERROR or self._state == self.STATE_CLOSED_WITH_ERROR
+        return self._state in [PRINTER_STATE['ERROR'], PRINTER_STATE['CLOSED_WITH_ERROR']]
 
     def isOperational(self):
-        return (self._state == self.STATE_OPERATIONAL
-                or self._state == self.STATE_PRINTING
-                or self._state == self.STATE_PAUSED
-                or self._state == self.STATE_TRANSFERING_FILE)
+        return self._state in [ PRINTER_STATE['OPERATIONAL'], PRINTER_STATE['PRINTING'], PRINTER_STATE['PAUSED']]
 
     def isPrinting(self):
-        return self._state == self.STATE_PRINTING
+        return self._state == PRINTER_STATE['PRINTING']
 
     def isStreaming(self):
-        return self._authentise_model is not None
+        return False
 
     def isPaused(self):
-        return self._state == self.STATE_PAUSED
+        return self._state == PRINTER_STATE['PAUSED']
 
     def isBusy(self):
         return self.isPrinting() or self.isPaused()
 
     def isSdReady(self):
-        return
+        return False
 
     def isSdFileSelected(self):
-        return
+        return False
 
     def isSdPrinting(self):
-        return
+        return False
 
     def getSdFiles(self):
         return
 
     def getPrintProgress(self):
-        return
+        return self._print_progress['percent_complete'] if self._print_progress else None
 
     def getPrintFilepos(self):
-        return
+        return int(self._print_progress['percent_complete']*10000) if self._print_progress else None
 
     def getPrintTime(self):
-        return
+        return self._print_progress['elapsed'] if self._print_progress else None
 
     def getCleanedPrintTime(self):
-        return
+        return self._print_progress['elapsed'] if self._print_progress else None
 
     def getTemp(self):
-        return
+        return self._tool_tempuratures
 
     def getBedTemp(self):
-        return
+        return self._bed_tempurature
 
     def getOffsets(self):
         return {}
@@ -300,8 +315,8 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
     ##~~ external interface
 
     def close(self, isError = False):
-        if self._temperature_timer and isinstance(self._temperature_timer, RepeatedTimer):
-            self._temperature_timer.cancel()
+        if self._printer_status_timer:
+            self._printer_status_timer.cancel()
 
         self._monitoring_active = False
 
@@ -314,14 +329,13 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         if self._authentise_process:
             self._authentise_process.send_signal(2) #send the SIGINT signal
 
-        self._changeState(self.STATE_CLOSED)
-        eventManager().fire(Events.DISCONNECTED)
+        self._change_state(PRINTER_STATE['CLOSED'])
 
     def setTemperatureOffset(self, offsets):
-        return
+        pass
 
     def fakeOk(self):
-        return
+        pass
 
     def sendCommand(self, cmd, cmd_type=None, processed=False):
         cmd = cmd.encode('ascii', 'replace')
@@ -330,11 +344,11 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
             if not cmd:
                 return
 
-        if self.isPrinting() or self.isOperational():
+        if self.isOperational():
             data = {'command': cmd}
             printer_command_url = urlparse.urljoin(self._printer_uri, 'command/')
 
-            response = requests.post(printer_command_url, json=data, auth=(self._api_key, self._api_secret))
+            response = self._session.post(printer_command_url, json=data)
             if not response.ok:
                 self._log(
                     'Warning: Got invalid response {}: {} for {}: {}'.format(
@@ -358,96 +372,32 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
             })
 
     def startPrint(self):
-        if not self.isOperational() or self.isPrinting():
-            return
-
-        try:
-            payload = {}
-            requests.post('http://print.authentise.com/print/', json=payload, auth=(self._api_key, self._api_secret))
-
-            self._changeState(self.STATE_PRINTING)
-            eventManager().fire(Events.PRINT_STARTED, None)
-
-        except: #pylint: disable=bare-except
-            self._logger.exception("Error while trying to start printing")
-            self._errorValue = get_exception_string()
-            self._changeState(self.STATE_ERROR)
-            eventManager().fire(Events.ERROR, {"error": self.getErrorString()})
+        pass
 
     def selectFile(self, model_uri, sd):
-        if self.isBusy():
-            return
-
-        self._authentise_model = {
-                'uri': model_uri,
-                'name': None,
-                'snapshot': None,
-                'content': None,
-                'manifold': None,
-                }
-
-        response = requests.get(model_uri)
-        if response.ok:
-            model_data = response.json()
-            self._authentise_model['name'] = model_data['name']
-            self._authentise_model['status'] = model_data['status']
-            self._authentise_model['snapshot'] = model_data['snapshot']
-            self._authentise_model['content'] = model_data['content']
-            self._authentise_model['manifold'] = model_data['analyses']['manifold']
-
-        eventManager().fire(Events.FILE_SELECTED, {
-            "file": self._authentise_model['name'],
-            "filename": self._authentise_model['name'],
-            "origin": self._authentise_model['uri'],
-        })
-        self._callback.on_comm_file_selected(model_uri, 0, False)
+        pass
 
     def unselectFile(self):
-        if self.isBusy():
-            return
-
-        self._authentise_model = None
-        eventManager().fire(Events.FILE_DESELECTED)
-        self._callback.on_comm_file_selected(None, None, False)
+        pass
 
     def cancelPrint(self):
-        if not self.isOperational() or self.isStreaming():
+        if not self.isPrinting() and not self.isPaused():
             return
 
-        if not self._authentise_model:
-            return
-
-        self._changeState(self.STATE_OPERATIONAL)
-
-        payload = {
-            "file": self._authentise_model['name'],
-            "filename": self._authentise_model['name'],
-            "origin": self._authentise_model['uri'],
-        }
-
-        eventManager().fire(Events.PRINT_CANCELLED, payload)
+        # send cancel command to authentise
+        # self._change_state(PRINTER_STATE['OPERATIONAL'])
+        # eventManager().fire(Events.PRINT_CANCELLED, payload)
 
     def setPause(self, pause):
-        if self.isStreaming():
-            return
-
-        if not self._authentise_model:
-            return
-
-        payload = {
-            "file": self._authentise_model['name'],
-            "filename": self._authentise_model['name'],
-            "origin": self._authentise_model['uri'],
-        }
-
         if not pause and self.isPaused():
-            self._changeState(self.STATE_PRINTING)
+            # send resume command to authentise
+            # self._change_state(PRINTER_STATE['PRINTING'])
+            pass
 
-            eventManager().fire(Events.PRINT_RESUMED, payload)
         elif pause and self.isPrinting():
-            self._changeState(self.STATE_PAUSED)
-
-            eventManager().fire(Events.PRINT_PAUSED, payload)
+            # send pause command to authentise
+            # self._change_state(PRINTER_STATE['PAUSED'])
+            pass
 
     def sendGcodeScript(self, scriptName, replacements=None):
         return
@@ -502,7 +452,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
             }, start_time_diff)
             return ''
 
-        response = requests.get(command_uri, auth=(self._api_key, self._api_secret))
+        response = self._session.get(command_uri)
 
         if response.ok and response.json()['status'] in ['error', 'printer_offline']:
             return ''
@@ -519,9 +469,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         return command_response['response']
 
     def _monitor_loop(self):
-
         self._log("Connected, starting monitor")
-
         while self._monitoring_active:
             try:
                 line = self._readline()
@@ -542,11 +490,72 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
                 errorMsg = "See octoprint.log for details"
                 self._log(errorMsg)
                 self._errorValue = errorMsg
-                self._changeState(self.STATE_ERROR)
-                eventManager().fire(Events.ERROR, {"error": self.getErrorString()})
+                self._change_state(PRINTER_STATE['ERROR'])
             time.sleep(0.1)
         self._log("Connection closed, closing down monitor")
 
-    def _poll_temperature(self):
-        if self.isOperational():
-            self.sendCommand("M105", cmd_type="temperature_poll")
+    def _update_printer_data(self):
+        if not self._printer_uri:
+            return
+
+        response = self._session.get(self._printer_uri)
+
+        if not response.ok:
+            self._log('Unable to get printer status: {}: {}'.format(response.status_code, response.content))
+            return
+
+        response_data = response.json()
+
+        self._update_state(response_data)
+        self._update_temps(response_data)
+
+        self._update_progress(response_data)
+
+    def _update_temps(self, response_data):
+        temps = response_data['temperatures']
+
+        self._tool_tempuratures = {0: [
+                temps['extruder1'].get('current') if temps.get('extruder1') else None,
+                temps['extruder1'].get('target') if temps.get('extruder1') else None,
+            ]}
+
+        self._bed_tempurature = [
+                temps['bed'].get('current') if temps.get('bed') else None,
+                temps['bed'].get('target') if temps.get('bed') else None,
+                ] if temps.get('bed') else None
+
+        self._callback.on_comm_temperature_update(self._tool_tempuratures, self._bed_tempurature)
+
+    def _update_progress(self, response_data):
+        current_print = response_data['current_print']
+
+        if current_print and response_data['current_print']['status'].lower() != 'new':
+            self._print_progress = {
+                'percent_complete' : current_print['percent_complete']/100,
+                'elapsed'          : current_print['elapsed'],
+                'remaining'        : current_print['remaining'],
+            }
+            self._callback.on_comm_set_progress_data(
+                    current_print['percent_complete'],
+                    current_print['percent_complete']*100 if current_print['percent_complete'] else None,
+                    current_print['elapsed'],
+                    current_print['remaining'],
+                    )
+        else:
+            self._print_progress = None
+            self._callback.on_comm_set_progress_data(None, None, None, None)
+
+    def _update_state(self, response_data):
+        if response_data['status'].lower() == 'online':
+            if not response_data['current_print'] or response_data['current_print']['status'].lower() == 'new':
+                self._change_state(PRINTER_STATE['OPERATIONAL'])
+
+            elif response_data['current_print']:
+                if response_data['current_print']['status'].lower() in ['printing', 'warming_up']:
+                    self._change_state(PRINTER_STATE['PRINTING'])
+                elif response_data['current_print']['status'].lower() == 'paused':
+                    self._change_state(PRINTER_STATE['PAUSED'])
+                else:
+                    self._log('Unknown print state: {}'.format(response_data['current_print']['status']))
+        else:
+            self._change_state(PRINTER_STATE['CONNECTING'])
