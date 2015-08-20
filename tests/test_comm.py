@@ -600,26 +600,13 @@ def test_setPause(printer_status, request_status, pause, comm, mocker):
     else:
         assert comm._send_pause_cancel_request.call_count == 0
 
-def test_send_pause_cancel_request_no_print_uri(comm, httpretty):
-    httpretty.reset()
-    comm._print_job_uri = None
-
-    comm._send_pause_cancel_request('cancel')
-    assert not httpretty.has_request()
-
-def test_send_pause_cancel_request_bad_print_url(comm, httpretty):
-    httpretty.reset()
-    comm._print_job_uri = 'http://not-a-good-url/'
-
-    comm._send_pause_cancel_request('resume')
-    assert httpretty.last_request().body == json.dumps({'status': 'resume'})
-
-@pytest.mark.parametrize("status", [
-    'resume',
-    'paused',
-    'cancel',
+@pytest.mark.parametrize("status, old_state, new_state", [
+    ('resume', _comm.PRINTER_STATE['PAUSED'], _comm.PRINTER_STATE['PRINTING']),
+    ('pause', _comm.PRINTER_STATE['PRINTING'], _comm.PRINTER_STATE['PAUSED']),
+    ('cancel', _comm.PRINTER_STATE['PRINTING'], _comm.PRINTER_STATE['OPERATIONAL']),
 ])
-def test_send_pause_cancel_request_normal_status(status, comm, httpretty):
+def test_send_pause_cancel_request_normal_status(status, old_state, new_state, comm, httpretty):
+    comm._state = old_state
     comm._print_job_uri = 'http://test.uri.com/job/1234/'
 
     httpretty.register_uri(httpretty.PUT,
@@ -629,6 +616,25 @@ def test_send_pause_cancel_request_normal_status(status, comm, httpretty):
 
     comm._send_pause_cancel_request(status)
     assert httpretty.last_request().body == json.dumps({'status': status})
+    assert comm._state == new_state
+
+def test_send_pause_cancel_request_no_print_uri(comm, httpretty):
+    comm._state = _comm.PRINTER_STATE['PRINTING']
+    httpretty.reset()
+    comm._print_job_uri = None
+
+    comm._send_pause_cancel_request('cancel')
+    assert not httpretty.has_request()
+    assert comm._state == _comm.PRINTER_STATE['PRINTING']
+
+def test_send_pause_cancel_request_bad_print_url(comm, httpretty):
+    comm._state = _comm.PRINTER_STATE['PRINTING']
+    httpretty.reset()
+    comm._print_job_uri = 'http://not-a-good-url/'
+
+    comm._send_pause_cancel_request('resume')
+    assert httpretty.last_request().body == json.dumps({'status': 'resume'})
+    assert comm._state == _comm.PRINTER_STATE['PRINTING']
 
 @pytest.mark.parametrize("response, expected_state", [
     ({'status': 'new'     , 'current_print': {'status':'new'}}        , _comm.PRINTER_STATE['CONNECTING']),
