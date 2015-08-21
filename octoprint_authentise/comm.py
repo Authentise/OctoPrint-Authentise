@@ -10,6 +10,7 @@ import urlparse
 from urllib import quote_plus
 
 import octoprint.plugin
+import requests
 from octoprint.events import Events, eventManager
 from octoprint.settings import settings
 from octoprint.util import RepeatedTimer, comm_helpers
@@ -82,6 +83,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
     _port = None
     _baudrate = None
     _printer_uri = None
+    _print_job_uri = None
 
     _authentise_process = None
     _authentise_model = None
@@ -329,6 +331,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         if self._authentise_process:
             self._authentise_process.send_signal(2) #send the SIGINT signal
 
+        self._print_job_uri = None
         self._change_state(PRINTER_STATE['CLOSED'])
 
     def setTemperatureOffset(self, offsets):
@@ -380,24 +383,32 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
     def unselectFile(self):
         pass
 
+    def _send_pause_cancel_request(self, status):
+        try:
+            response = self._session.put(self._print_job_uri, json={'status':status})
+        except (requests.exceptions.MissingSchema, requests.exceptions.ConnectionError) as e:
+            self._log('Request to {} generated error: {}'.format(self._print_job_uri, e))
+            response = None
+
+        if response and response.ok:
+            status_map = {
+                    'cancel': PRINTER_STATE['OPERATIONAL'],
+                    'pause': PRINTER_STATE['PAUSED'],
+                    'resume': PRINTER_STATE['PRINTING'],
+                    }
+            self._change_state(status_map[status])
+
     def cancelPrint(self):
         if not self.isPrinting() and not self.isPaused():
             return
-
-        # send cancel command to authentise
-        # self._change_state(PRINTER_STATE['OPERATIONAL'])
-        # eventManager().fire(Events.PRINT_CANCELLED, payload)
+        self._send_pause_cancel_request('cancel')
 
     def setPause(self, pause):
         if not pause and self.isPaused():
-            # send resume command to authentise
-            # self._change_state(PRINTER_STATE['PRINTING'])
-            pass
+            self._send_pause_cancel_request('resume')
 
         elif pause and self.isPrinting():
-            # send pause command to authentise
-            # self._change_state(PRINTER_STATE['PAUSED'])
-            pass
+            self._send_pause_cancel_request('pause')
 
     def sendGcodeScript(self, scriptName, replacements=None):
         return
@@ -505,6 +516,11 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
             return
 
         response_data = response.json()
+
+        if response_data['current_print'] and response_data['current_print']['status'].lower() != 'new':
+            self._print_job_uri = response_data['current_print']['job_uri']
+        else:
+            self._print_job_uri = None
 
         self._update_state(response_data)
         self._update_temps(response_data)
