@@ -242,11 +242,25 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
     def getState(self):
         return self._state
 
-    def getStateString(self): #pylint: disable=too-many-return-statements
-        if self._state in [PRINTER_STATE['ERROR'], PRINTER_STATE['CLOSED_WITH_ERROR']]:
+    def getStateId(self, state=None):
+         if state is None:
+             state = self._state
+
+         possible_states = filter(lambda x: x.startswith("STATE_"), self.__class__.__dict__.keys())
+         for possible_state in possible_states:
+             if getattr(self, possible_state) == state:
+                 return possible_state[len("STATE_"):]
+
+         return "UNKNOWN"
+
+    def getStateString(self, state=None): #pylint: disable=too-many-return-statements
+        if not state:
+            state = self._state
+
+        if state in [PRINTER_STATE['ERROR'], PRINTER_STATE['CLOSED_WITH_ERROR']]:
             return "Error: {}".format(self.getErrorString())
 
-        return PRINTER_STATE_REVERSE[self._state].title()
+        return PRINTER_STATE_REVERSE[state].title()
 
     def getErrorString(self):
         return self._errorValue
