@@ -243,15 +243,15 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         return self._state
 
     def getStateId(self, state=None):
-         if state is None:
-             state = self._state
+        if state is None:
+            state = self._state
 
-         possible_states = filter(lambda x: x.startswith("STATE_"), self.__class__.__dict__.keys())
-         for possible_state in possible_states:
-             if getattr(self, possible_state) == state:
-                 return possible_state[len("STATE_"):]
+        possible_states = filter(lambda x: x.startswith("STATE_"), self.__class__.__dict__.keys()) #pylint: disable=bad-builtin, deprecated-lambda
+        for possible_state in possible_states:
+            if getattr(self, possible_state) == state:
+                return possible_state[len("STATE_"):]
 
-         return "UNKNOWN"
+        return "UNKNOWN"
 
     def getStateString(self, state=None): #pylint: disable=too-many-return-statements
         if not state:
@@ -330,7 +330,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
 
     ##~~ external interface
 
-    def close(self, isError = False):
+    def close(self, is_error=False, wait=True, *args, **kwargs):
         if self._printer_status_timer:
             self._printer_status_timer.cancel()
 
@@ -354,7 +354,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
     def fakeOk(self):
         pass
 
-    def sendCommand(self, cmd, cmd_type=None, processed=False):
+    def sendCommand(self, cmd, cmd_type=None, processed=False, force=False):
         cmd = cmd.encode('ascii', 'replace')
         if not processed:
             cmd = comm_helpers.process_gcode_line(cmd)
@@ -446,6 +446,12 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         return
 
     def releaseSdCard(self):
+        return
+
+    def sayHello(self):
+        return
+
+    def resetLineNumbers(self, number=0):
         return
 
     ##~~ Serial monitor processing received messages
