@@ -45,7 +45,9 @@ plugin_url = "https://github.com/authentise/OctoPrint-Authentise"
 plugin_license = "AGPLv3"
 
 # Any additional requirements besides OctoPrint should be listed here
-plugin_requires = []
+plugin_requires = [
+    'requests==2.8.1',
+]
 
 extra_requires = {
     'develop': [
