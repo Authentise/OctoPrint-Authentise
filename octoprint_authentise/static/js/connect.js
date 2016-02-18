@@ -22,7 +22,7 @@ $(function() {
 
       var handleError = $.proxy(function(jqXHR, textStatus, errorThrown){
         var results = jqXHR.responseJSON;
-        this.setMessage(results.message);
+        this.setMessage(results.errors[0].title);
         console.error("Error connecting to Authentise", results, jqXHR, textStatus, errorThrown);
       }, this);
 
