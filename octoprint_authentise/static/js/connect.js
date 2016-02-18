@@ -43,8 +43,8 @@ $(function() {
     this.setKey = $.proxy(function(result) {
       var keyInput = $("#authentise-settings input[name=key]");
       var secretInput = $("#authentise-settings input[name=secret]");
-      keyInput.val(result.uuid);
-      secretInput.val(result.secret);
+      keyInput.val(result.uuid).change();
+      secretInput.val(result.secret).change();
     }, this);
 
     this.setMessage = $.proxy(function(message) {
