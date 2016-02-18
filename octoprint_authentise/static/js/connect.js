@@ -87,6 +87,5 @@ $(function() {
     AuthentiseConnectViewModel,
     ["settingsViewModel"],
     ['#authentise-connect'],
-    // ['#settings_plugin_authentise']
   ]);
 });
