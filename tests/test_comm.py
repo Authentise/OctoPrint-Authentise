@@ -6,6 +6,7 @@ from urlparse import urljoin
 import pytest
 from octoprint.events import Events
 
+import tests.helpers
 from octoprint_authentise import comm as _comm
 
 
@@ -20,9 +21,7 @@ def test_printer_connect_create_authentise_printer(comm, printer, httpretty, moc
                            adding_headers={"Location": printer['uri']})
 
     # keep authentise and monitoring threads from actually starting
-    mocker.patch('octoprint_authentise.comm.threading.Thread')
-    mocker.patch('octoprint_authentise.comm.RepeatedTimer')
-    mocker.patch("octoprint_authentise.comm.helpers.run_client")
+    tests.helpers.patch_connect(mocker)
 
     comm.connect(port="1234", baudrate=5678)
 
@@ -39,9 +38,7 @@ def test_printer_connect_get_authentise_printer(comm, printer, httpretty, mocker
 
 
     # keep authentise and monitoring threads from actually starting
-    mocker.patch('octoprint_authentise.comm.threading.Thread')
-    mocker.patch('octoprint_authentise.comm.RepeatedTimer')
-    mocker.patch("octoprint_authentise.comm.helpers.run_client")
+    tests.helpers.patch_connect(mocker)
 
     comm.connect(port="/dev/tty.derp", baudrate=5678)
 
@@ -52,9 +49,7 @@ def test_printer_connect_get_authentise_printer(comm, printer, httpretty, mocker
 # tests case in which port and baud rate are just right
 def test_printer_connect_get_authentise_printer_no_put(comm, printer, mocker):
     # keep authentise and monitoring threads from actually starting
-    mocker.patch('octoprint_authentise.comm.threading.Thread')
-    mocker.patch('octoprint_authentise.comm.RepeatedTimer')
-    mocker.patch("octoprint_authentise.comm.helpers.run_client")
+    tests.helpers.patch_connect(mocker)
 
     comm.connect(port="/dev/tty.derp", baudrate=250000)
 
@@ -276,8 +271,9 @@ def test_printer_connect_get_authentise_printer_no_put(comm, printer, mocker):
             'start_time'   : 0,
             'previous_time' : 10,
         },
-    ),
-]) #pylint: disable=too-many-arguments
+    ), #pylint: disable=too-many-arguments
+])
+@pytest.mark.usefixtures('connect_printer')
 def test_readline(comm, httpretty, set_time, command_queue, response, current_time, expected_return, expected_queue):
     set_time(current_time)
 
@@ -605,6 +601,7 @@ def test_setPause(printer_status, request_status, pause, comm, mocker):
     ('pause', _comm.PRINTER_STATE['PRINTING'], _comm.PRINTER_STATE['PAUSED']),
     ('cancel', _comm.PRINTER_STATE['PRINTING'], _comm.PRINTER_STATE['OPERATIONAL']),
 ])
+@pytest.mark.usefixtures('connect_printer')
 def test_send_pause_cancel_request_normal_status(status, old_state, new_state, comm, httpretty):
     comm._state = old_state
     comm._print_job_uri = 'http://test.uri.com/job/1234/'
@@ -618,6 +615,7 @@ def test_send_pause_cancel_request_normal_status(status, old_state, new_state, c
     assert httpretty.last_request().body == json.dumps({'status': status})
     assert comm._state == new_state
 
+@pytest.mark.usefixtures('connect_printer')
 def test_send_pause_cancel_request_no_print_uri(comm, httpretty):
     comm._state = _comm.PRINTER_STATE['PRINTING']
     httpretty.reset()
@@ -627,6 +625,7 @@ def test_send_pause_cancel_request_no_print_uri(comm, httpretty):
     assert not httpretty.has_request()
     assert comm._state == _comm.PRINTER_STATE['PRINTING']
 
+@pytest.mark.usefixtures('connect_printer')
 def test_send_pause_cancel_request_bad_print_url(comm, httpretty):
     comm._state = _comm.PRINTER_STATE['PRINTING']
     httpretty.reset()

@@ -8,6 +8,7 @@ import octoprint.plugin
 import octoprint.settings
 import pytest
 
+import tests.helpers
 from octoprint_authentise import AuthentisePlugin
 
 LOGGER = logging.getLogger(__name__)
@@ -80,9 +81,7 @@ def printer(comm, node_uuid, settings, httpretty): #pylint: disable=redefined-ou
 
 @pytest.fixture
 def connect_printer(comm, printer, mocker, event_manager): #pylint: disable=redefined-outer-name, unused-argument
-    mocker.patch('octoprint_authentise.comm.threading.Thread')
-    mocker.patch('octoprint_authentise.comm.RepeatedTimer')
-    mocker.patch("octoprint_authentise.comm.helpers.run_client")
+    tests.helpers.patch_connect(mocker)
 
     comm.connect(port=printer['port'], baudrate=printer['baud_rate'])
 
