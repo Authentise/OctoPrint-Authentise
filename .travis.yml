@@ -3,7 +3,7 @@ python:
 - '2.7'
 before_install:
 - mkdir -p ~/src/
-- git clone --branch=MachineComPlugin git://github.com/Authentise/OctoPrint.git ~/src/octoprint
+- git clone --branch=AE-981 git://bitbucket.org/Authentise/octoprint-type-a.git ~/src/octoprint
 install:
 - pip install --upgrade pip
 - pip install ~/src/octoprint
