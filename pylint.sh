@@ -7,4 +7,4 @@ else
     FILES="$1"
     echo "linting $FILES"
 fi
-pylint --rcfile=tests/pylint.cfg $FILES --reports=no
+pylint $FILES --reports=no
