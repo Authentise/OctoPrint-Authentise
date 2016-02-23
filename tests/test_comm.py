@@ -331,7 +331,8 @@ def test_parse_temps(line, expected):
     (_comm.PRINTER_STATE['OPERATIONAL'], _comm.PRINTER_STATE['ERROR'], (Events.ERROR, {'error': None})),
     (_comm.PRINTER_STATE['OPERATIONAL'], _comm.PRINTER_STATE['CLOSED_WITH_ERROR'], (Events.ERROR, {'error': None})),
 ])
-def test_change_state(old_state, new_state, event, comm, connect_printer, event_manager): #pylint: disable=unused-argument
+@pytest.mark.usefixtures('connect_printer')
+def test_change_state(old_state, new_state, event, comm, event_manager):
     comm._state = old_state
     comm._change_state(new_state)
 
@@ -495,7 +496,8 @@ def test_getOffsets(comm):
 def test_getCurrentTool(comm):
     assert comm.getCurrentTool() == 0
 
-def test_getConnection(comm, connect_printer): #pylint: disable=unused-argument
+@pytest.mark.usefixtures('connect_printer')
+def test_getConnection(comm):
     assert comm.getConnection() == ('/dev/tty.derp', 250000)
 
 def test_getTransport(comm):
@@ -503,7 +505,8 @@ def test_getTransport(comm):
 
 ### TESTS FOR OTHER METHODS ###
 
-def test_close_not_printing(comm, connect_printer, event_manager): #pylint: disable=unused-argument
+@pytest.mark.usefixtures('connect_printer')
+def test_close_not_printing(comm, event_manager):
     comm._state = _comm.PRINTER_STATE['OPERATIONAL']
     comm.close()
 
@@ -512,7 +515,8 @@ def test_close_not_printing(comm, connect_printer, event_manager): #pylint: disa
     assert comm._state == _comm.PRINTER_STATE['CLOSED']
     event_manager.fire.assert_called_once_with(Events.DISCONNECTED)
 
-def test_close_while_printing(comm, connect_printer, event_manager): #pylint: disable=unused-argument
+@pytest.mark.usefixtures('connect_printer')
+def test_close_while_printing(comm, event_manager):
     comm._print_job_uri = 'test'
     comm._state = _comm.PRINTER_STATE['PRINTING']
     comm.close()
@@ -528,7 +532,8 @@ def test_close_while_printing(comm, connect_printer, event_manager): #pylint: di
     ('G1 X50 Y50', 'G1 X50 Y50'),
     (u'G28; HOME!!!!', 'G28'),
 ])
-def test_send_command_printer_operational(command, sent_command, comm, connect_printer, httpretty, set_time): #pylint: disable=unused-argument
+@pytest.mark.usefixtures('connect_printer')
+def test_send_command_printer_operational(command, sent_command, comm, httpretty, set_time):
     now = 12345
     set_time(now)
 
@@ -547,7 +552,8 @@ def test_send_command_printer_operational(command, sent_command, comm, connect_p
     assert comm._command_uri_queue.get_nowait() == expected
     assert httpretty.last_request().body == json.dumps({'command': sent_command})
 
-def test_send_command_printer_not_operational(comm, connect_printer, httpretty): #pylint: disable=unused-argument
+@pytest.mark.usefixtures('connect_printer')
+def test_send_command_printer_not_operational(comm, httpretty):
     httpretty.reset()
     comm._state = _comm.PRINTER_STATE['OFFLINE']
 
@@ -556,7 +562,8 @@ def test_send_command_printer_not_operational(comm, connect_printer, httpretty):
         comm._command_uri_queue.get_nowait()
     assert not httpretty.has_request()
 
-def test_send_command_bad_response(comm, connect_printer, httpretty): #pylint: disable=unused-argument
+@pytest.mark.usefixtures('connect_printer')
+def test_send_command_bad_response(comm, httpretty):
     comm._state = _comm.PRINTER_STATE['OPERATIONAL']
 
     command_uri = urljoin(comm._printer_uri, 'command/1234-asdf/')
@@ -682,7 +689,8 @@ def test_update_temps(response, expected_temps, expected_bed, comm):
     assert comm._tool_tempuratures == expected_temps
     assert comm._bed_tempurature == expected_bed
 
-def test_update_printer_data_ok_response(comm, connect_printer, httpretty, assert_almost_equal): #pylint: disable=unused-argument
+@pytest.mark.usefixtures('connect_printer')
+def test_update_printer_data_ok_response(comm, httpretty, assert_almost_equal):
     comm._state = _comm.PRINTER_STATE['CONNECTING']
     comm._tool_tempuratures = None
     comm._bed_tempurature = None
@@ -715,7 +723,8 @@ def test_update_printer_data_ok_response(comm, connect_printer, httpretty, asser
     assert comm._print_job_uri == 'http://some-job-uri.com/'
     assert_almost_equal(comm._print_progress, {'percent_complete': 0.1055, 'elapsed': 30, 'remaining': 0.4})
 
-def test_update_printer_data_not_printing(comm, connect_printer, httpretty, assert_almost_equal): #pylint: disable=unused-argument
+@pytest.mark.usefixtures('connect_printer')
+def test_update_printer_data_not_printing(comm, httpretty):
     comm._state = _comm.PRINTER_STATE['CONNECTING']
     comm._tool_tempuratures = None
     comm._bed_tempurature = None
@@ -743,7 +752,8 @@ def test_update_printer_data_not_printing(comm, connect_printer, httpretty, asse
     assert comm._print_job_uri == None
     assert comm._print_progress == None
 
-def test_update_printer_data_bad_response(comm, connect_printer, httpretty): #pylint: disable=unused-argument
+@pytest.mark.usefixtures('connect_printer')
+def test_update_printer_data_bad_response(comm, httpretty):
     comm._state = _comm.PRINTER_STATE['CONNECTING']
     comm._tool_tempuratures = None
     comm._bed_tempurature = None
