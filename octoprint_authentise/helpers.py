@@ -4,6 +4,7 @@ from __future__ import absolute_import
 import json
 import os
 import subprocess
+from urlparse import urljoin
 from uuid import uuid4
 
 import requests
@@ -40,36 +41,35 @@ def run_client(settings, args=None, pipe=None):
         pipe=DEVNULL
     return subprocess.Popen(command, stdout=pipe, stderr=pipe)
 
-def claim_node(settings, node_uuid, api_key, api_secret, logger):
+class ClaimNodeException(Exception):
+    pass
+
+def claim_node(node_uuid, settings, logger):
+    _session = session(settings)
+
     if not node_uuid:
-        logger.error("No node uuid available to claim")
-        return False
+        raise ClaimNodeException("No Authentise node uuid available to claim")
 
-    if not api_key:
-        logger.error("No API Key available to claim node")
-        return False
-
-    if not api_secret:
-        logger.error("No API secret available to claim node")
-        return False
+    url = urljoin(settings.get(["authentise_url"]), "client/{}/".format(node_uuid))
+    response = _session.get(url)
+    if response.ok:
+        return
 
     claim_code = run_client_and_wait(settings, args=['--connection-code'], logger=logger)
     if claim_code:
         logger.info("Got claim code: %s", claim_code)
     else:
-        logger.error("Could not get a claim code from Authentise")
-        return False
+        raise ClaimNodeException("Could not get a claim code from Authentise")
 
-    url = "{}/client/claim/{}/".format(settings.get(["authentise_url"]), claim_code)
-    response = requests.put(url, auth=(api_key, api_secret))
+    url = urljoin(settings.get(["authentise_url"]), "client/claim/{}/".format(claim_code))
+    response = _session.put(url)
     logger.info("Response from - POST %s - %s - %s", url, response.status_code, response.text)
 
     if response.ok:
         logger.info("Claimed node: %s", node_uuid)
-        return True
+        return
 
-    logger.error("Could not use claim code %s for node %s", claim_code, node_uuid)
-    return False
+    raise ClaimNodeException("Could not use claim code {} for node {}".format(claim_code, node_uuid))
 
 def login(settings, username, password, logger):
     url = '{}/sessions/'.format(settings.get(["authentise_user_url"]))
@@ -106,7 +106,19 @@ def create_api_token(settings, cookies, logger):
 
     return response.status_code, json.loads(response.text)
 
+class SessionException(Exception):
+    pass
+
 def session(settings):
+    api_key = settings.get(['api_key'])
+    api_secret = settings.get(['api_secret'])
+
+    if not api_key:
+        raise SessionException("No Authentise API Key available to claim node")
+
+    if not api_secret:
+        raise SessionException("No Authentise API secret available to claim node")
+
     _session = requests.Session()
-    _session.auth = requests.auth.HTTPBasicAuth(settings.get(['api_key']), settings.get(['api_secret']))
+    _session.auth = requests.auth.HTTPBasicAuth(api_key, api_secret)
     return _session

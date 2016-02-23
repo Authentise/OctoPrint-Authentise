@@ -54,7 +54,7 @@ extra_requires = {
         'pytest==2.7.2',
         'pytest-mock==0.7.0',
         'httpretty==0.8.10',
-        'pylint==1.4.4',
+        'pylint==1.5.4',
         'isort==4.0.0',
         'ipython==3.2.1',
     ]

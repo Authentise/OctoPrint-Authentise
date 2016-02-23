@@ -124,9 +124,16 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         self._printer_profile_manager = printerProfileManager
 
         self._authentise_url = self._settings.get(['authentise_url']) #pylint: disable=no-member
-        self._session = helpers.session(self._settings) #pylint: disable=no-member
 
     def connect(self, port=None, baudrate=None):
+        try:
+            self._session = helpers.session(self._settings) #pylint: disable=no-member
+            helpers.claim_node(self.node_uuid, self._settings, self._logger) #pylint: disable=no-member
+        except (helpers.ClaimNodeException, helpers.SessionException) as e:
+            self._errorValue = e.message
+            self._change_state(PRINTER_STATE['ERROR'])
+            return
+
         if port == None:
             port = settings().get(["serial", "port"])
         if baudrate == None:
@@ -253,7 +260,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
 
         return "UNKNOWN"
 
-    def getStateString(self, state=None): #pylint: disable=too-many-return-statements
+    def getStateString(self, state=None): #pylint: disable=arguments-differ
         if not state:
             state = self._state
 
@@ -330,7 +337,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
 
     ##~~ external interface
 
-    def close(self, is_error=False, wait=True, *args, **kwargs):
+    def close(self, is_error=False, wait=True, *args, **kwargs): #pylint: disable=unused-argument
         if self._printer_status_timer:
             self._printer_status_timer.cancel()
 
@@ -354,7 +361,7 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
     def fakeOk(self):
         pass
 
-    def sendCommand(self, cmd, cmd_type=None, processed=False, force=False):
+    def sendCommand(self, cmd, cmd_type=None, processed=False, force=False): #pylint: disable=unused-argument, arguments-differ
         cmd = cmd.encode('ascii', 'replace')
         if not processed:
             cmd = comm_helpers.process_gcode_line(cmd)
@@ -448,10 +455,10 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
     def releaseSdCard(self):
         return
 
-    def sayHello(self):
+    def sayHello(self): #pylint: disable=no-self-use
         return
 
-    def resetLineNumbers(self, number=0):
+    def resetLineNumbers(self, number=0): #pylint: disable=unused-argument, no-self-use
         return
 
     ##~~ Serial monitor processing received messages

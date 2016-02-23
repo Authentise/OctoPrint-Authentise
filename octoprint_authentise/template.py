@@ -18,4 +18,5 @@ class TemplatePlugin(octoprint.plugin.TemplatePlugin):
         return [
             dict(type="settings", custom_bindings=False),
             dict(type="tab"),
+            dict(type="generic", template="authentise_generic.jinja2"),
         ]
