@@ -8,9 +8,9 @@ from octoprint.events import Events
 
 import tests.helpers
 from octoprint_authentise import comm as _comm
+from octoprint_authentise import helpers
 
 
-# tests case in which the user has no authentise printers
 def test_printer_connect_create_authentise_printer(comm, printer, httpretty, mocker):
     httpretty.register_uri(httpretty.GET,
                            printer['request_url'],
@@ -20,7 +20,6 @@ def test_printer_connect_create_authentise_printer(comm, printer, httpretty, moc
     httpretty.register_uri(httpretty.POST, printer['request_url'],
                            adding_headers={"Location": printer['uri']})
 
-    # keep authentise and monitoring threads from actually starting
     tests.helpers.patch_connect(mocker)
 
     comm.connect(port="1234", baudrate=5678)
@@ -28,16 +27,12 @@ def test_printer_connect_create_authentise_printer(comm, printer, httpretty, moc
     assert comm.getState() == _comm.PRINTER_STATE['CONNECTING']
     assert comm._printer_uri == printer['uri']
 
-
-# tests case in which the user has a printer on the right port, but the baud rate is wrong
 def test_printer_connect_get_authentise_printer(comm, printer, httpretty, mocker,):
     httpretty.register_uri(httpretty.POST, printer['request_url'],
                            adding_headers={"Location": printer['uri']})
 
     httpretty.register_uri(httpretty.PUT, printer['uri'])
 
-
-    # keep authentise and monitoring threads from actually starting
     tests.helpers.patch_connect(mocker)
 
     comm.connect(port="/dev/tty.derp", baudrate=5678)
@@ -45,16 +40,32 @@ def test_printer_connect_get_authentise_printer(comm, printer, httpretty, mocker
     assert comm.getState() == _comm.PRINTER_STATE['CONNECTING']
     assert comm._printer_uri == printer['uri']
 
-
-# tests case in which port and baud rate are just right
 def test_printer_connect_get_authentise_printer_no_put(comm, printer, mocker):
-    # keep authentise and monitoring threads from actually starting
     tests.helpers.patch_connect(mocker)
 
     comm.connect(port="/dev/tty.derp", baudrate=250000)
 
     assert comm.getState() == _comm.PRINTER_STATE['CONNECTING']
     assert comm._printer_uri == printer['uri']
+
+def test_printer_connect_session_error(comm, mocker, event_manager):
+    tests.helpers.patch_connect(mocker)
+    mocker.patch("octoprint_authentise.comm.helpers.session", side_effect=helpers.SessionException('a session error message'))
+
+    comm.connect(port="/dev/tty.derp", baudrate=250000)
+
+    event_manager.fire.assert_called_once_with(Events.ERROR, {'error': 'a session error message'})
+
+def test_printer_connect_claim_node_error(comm, mocker, event_manager):
+    mocker.patch('octoprint_authentise.comm.threading.Thread')
+    mocker.patch('octoprint_authentise.comm.RepeatedTimer')
+    mocker.patch("octoprint_authentise.comm.helpers.run_client")
+
+    mocker.patch("octoprint_authentise.comm.helpers.claim_node", side_effect=helpers.ClaimNodeException('a claim node error message'))
+
+    comm.connect(port="/dev/tty.derp", baudrate=250000)
+
+    event_manager.fire.assert_called_once_with(Events.ERROR, {'error': 'a claim node error message'})
 
 @pytest.mark.parametrize("command_queue, response, current_time, expected_return, expected_queue", [
     (

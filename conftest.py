@@ -1,5 +1,6 @@
 import json
 import logging
+import random
 import uuid
 from urlparse import urljoin
 
@@ -88,6 +89,18 @@ def connect_printer(comm, printer, mocker, event_manager): #pylint: disable=rede
 @pytest.fixture
 def node_uuid():
     return uuid.uuid4()
+
+@pytest.fixture
+def client_uri(settings, node_uuid): #pylint: disable=redefined-outer-name
+    return urljoin(settings.get(["authentise_url"]), "client/{}/".format(node_uuid))
+
+@pytest.fixture
+def claim_code():
+    return ''.join([random.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(6)])
+
+@pytest.fixture
+def claim_code_uri(settings, claim_code): #pylint: disable=redefined-outer-name
+    return urljoin(settings.get(["authentise_url"]), "client/claim/{}/".format(claim_code))
 
 @pytest.fixture
 def event_manager(mocker):

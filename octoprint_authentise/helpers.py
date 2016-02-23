@@ -4,6 +4,7 @@ from __future__ import absolute_import
 import json
 import os
 import subprocess
+from urlparse import urljoin
 from uuid import uuid4
 
 import requests
@@ -49,7 +50,7 @@ def claim_node(node_uuid, settings, logger):
     if not node_uuid:
         raise ClaimNodeException("No Authentise node uuid available to claim")
 
-    url = "{}/client/{}/".format(settings.get(["authentise_url"]), node_uuid)
+    url = urljoin(settings.get(["authentise_url"]), "client/{}/".format(node_uuid))
     response = _session.get(url)
     if response.ok:
         return
@@ -60,7 +61,7 @@ def claim_node(node_uuid, settings, logger):
     else:
         raise ClaimNodeException("Could not get a claim code from Authentise")
 
-    url = "{}/client/claim/{}/".format(settings.get(["authentise_url"]), claim_code)
+    url = urljoin(settings.get(["authentise_url"]), "client/claim/{}/".format(claim_code))
     response = _session.put(url)
     logger.info("Response from - POST %s - %s - %s", url, response.status_code, response.text)
 
