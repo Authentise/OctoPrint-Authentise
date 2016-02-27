@@ -11,7 +11,7 @@ class SettingsPlugin(octoprint.plugin.SettingsPlugin):
             api_secret=None,
             authentise_url='https://print.authentise.com',
             authentise_user_url='https://users.authentise.com',
-            streamus_client_path='streamus-client',
+            streamus_client_path='authentise',
             streamus_config_path=None,
             frame_src='https://app.authentise.com/#/models',
         )
