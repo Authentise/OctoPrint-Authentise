@@ -1,1 +1,3 @@
 include README.md
+recursive-include octoprint_authentise/static *
+recursive-include octoprint_authentise/templates *
