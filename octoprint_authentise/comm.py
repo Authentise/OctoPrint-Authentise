@@ -188,11 +188,18 @@ class MachineCom(octoprint.plugin.MachineComPlugin): #pylint: disable=too-many-i
         else:
             self._log('No printer found for port {}. Creating it.'.format(port))
 
-            payload = {'client': client_url,
-                       'printer_model': 'https://print.dev-auth.com/printer/model/9/',
-                       'name': 'Octoprint Printer',
-                       'port': port,
-                       'baud_rate': baud_rate}
+            if os.path.exists('/usr/lib/python2.7/dist-packages/octoprint/static/img/type_a_machines.svg'):
+                model = 14
+            else:
+                model = 9
+
+            payload = {
+                'baud_rate'         : baud_rate,
+                'client'            : client_url,
+                'name'              : 'Octoprint Printer',
+                'port'              : port,
+                'printer_model'     : 'https://print.dev-auth.com/printer/model/{}/'.format(model),
+            }
             create_printer_resp = self._session.post(urlparse.urljoin(self._authentise_url,
                                                                  '/printer/instance/'),
                                                 json=payload)
